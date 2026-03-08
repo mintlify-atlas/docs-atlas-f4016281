@@ -1,0 +1,556 @@
+---
+title: Agent Skills
+description: Preload domain knowledge into agents at startup
+---
+
+Agent skills inject full skill content into agent context at startup. Use this to give agents domain-specific knowledge, project patterns, or procedural expertise without manual context loading.
+
+## Why Preload Skills?
+
+<CardGroup cols={2}>
+  <Card title="Always Available" icon="circle-check">
+    Skills load automatically when agent starts. No invocation needed.
+  </Card>
+  <Card title="Domain Knowledge" icon="brain">
+    Give agents project patterns, API conventions, and best practices.
+  </Card>
+  <Card title="Consistent Behavior" icon="equals">
+    Every invocation has the same baseline knowledge.
+  </Card>
+  <Card title="Context Efficiency" icon="gauge-high">
+    Load once at startup vs. fetching repeatedly during execution.
+  </Card>
+</CardGroup>
+
+## Basic Usage
+
+```yaml
+---
+name: orchestrator
+skills: ["pro-workflow", "api-conventions"]
+---
+
+Agent starts with Pro Workflow patterns and API conventions already loaded.
+```
+
+When the orchestrator agent starts:
+1. Reads `skills/pro-workflow/SKILL.md`
+2. Reads `skills/api-conventions/SKILL.md`
+3. Injects full content into agent context
+4. Agent can reference skill content in every response
+
+## Skill Discovery
+
+Skills are discovered from:
+
+1. **Project:** `.claude/skills/*/SKILL.md`
+2. **User:** `~/.claude/skills/*/SKILL.md`
+3. **Plugin:** `~/.claude/plugins/*/skills/*/SKILL.md`
+
+<Info>
+  Skill names come from the directory name, not the file name.
+  Example: `skills/api-conventions/SKILL.md` → skill name is `api-conventions`.
+</Info>
+
+## Examples
+
+### Planning with Project Patterns
+
+```yaml
+---
+name: planner
+tools: ["Read", "Glob", "Grep"]
+skills: ["project-patterns"]
+model: opus
+---
+
+# Planner
+
+Create implementation plans following project patterns.
+```
+
+**Skill:** `skills/project-patterns/SKILL.md`
+
+```markdown
+---
+name: project-patterns
+description: Common patterns in this project
+---
+
+# Project Patterns
+
+## File Structure
+
+- `src/routes/` - API endpoints (Express handlers)
+- `src/services/` - Business logic
+- `src/db/` - Database queries
+- `src/types/` - TypeScript interfaces
+
+## Patterns
+
+### API Endpoints
+
+```typescript
+// Always validate input first
+export async function handler(req: Request, res: Response) {
+  const validation = validateInput(req.body);
+  if (!validation.success) {
+    return res.status(400).json({ error: validation.error });
+  }
+  
+  // Business logic in service layer
+  const result = await userService.create(validation.data);
+  return res.status(201).json(result);
+}
+```
+
+### Error Handling
+
+- Use custom error classes from `src/errors/`
+- Always include error codes
+- Log errors with context
+```
+
+Now when the planner agent creates plans, it knows to:
+- Place endpoints in `src/routes/`
+- Extract business logic to `src/services/`
+- Use custom error classes
+- Follow project structure
+
+### Implementation with API Conventions
+
+```yaml
+---
+name: implementer
+tools: ["Read", "Edit", "Bash"]
+skills: ["api-conventions", "error-handling"]
+---
+
+# Implementer
+
+Implement features following API conventions and error handling patterns.
+```
+
+**Skills:**
+
+<CodeGroup>
+
+```markdown api-conventions
+---
+name: api-conventions
+description: REST API design patterns
+---
+
+# API Conventions
+
+- Use camelCase for JSON properties
+- Use snake_case for database columns
+- Bearer token auth on all protected routes
+- Rate limiting: 100 req/min per IP
+- Pagination: ?page=1&limit=20 (default limit: 10, max: 100)
+- Error format: RFC 7807 (application/problem+json)
+```
+
+```markdown error-handling
+---
+name: error-handling
+description: Error handling best practices
+---
+
+# Error Handling
+
+## Custom Errors
+
+```typescript
+export class ValidationError extends Error {
+  code = 'VALIDATION_ERROR';
+  statusCode = 400;
+}
+
+export class NotFoundError extends Error {
+  code = 'NOT_FOUND';
+  statusCode = 404;
+}
+```
+
+## Error Middleware
+
+Always use centralized error handler:
+
+```typescript
+app.use((err, req, res, next) => {
+  logger.error({ err, req: { url: req.url, method: req.method } });
+  res.status(err.statusCode || 500).json({
+    error: err.message,
+    code: err.code
+  });
+});
+```
+
+</CodeGroup>
+
+### Review with Security Patterns
+
+```yaml
+---
+name: reviewer
+tools: ["Read", "Grep", "Bash"]
+skills: ["security-checklist"]
+---
+
+# Reviewer
+
+Code review with security focus.
+```
+
+**Skill:** `skills/security-checklist/SKILL.md`
+
+```markdown
+---
+name: security-checklist
+description: Security patterns to check
+---
+
+# Security Checklist
+
+## Input Validation
+
+- [ ] All user inputs validated
+- [ ] SQL injection prevented (parameterized queries only)
+- [ ] XSS prevention (escape output)
+- [ ] File upload validation (type, size, content)
+
+## Authentication
+
+- [ ] Passwords hashed (bcrypt, min 10 rounds)
+- [ ] JWT tokens with expiry
+- [ ] CSRF tokens on mutations
+- [ ] Rate limiting on auth endpoints
+
+## Secrets
+
+- [ ] No secrets in code
+- [ ] Environment variables only
+- [ ] .env in .gitignore
+- [ ] Rotate secrets regularly
+
+## Dependencies
+
+- [ ] npm audit passes
+- [ ] No known vulnerabilities
+- [ ] Dependencies pinned
+```
+
+Reviewer agent now checks all items automatically.
+
+## Agent + Skill Combinations
+
+| Agent Type | Recommended Skills |
+|------------|-------------------|
+| **planner** | `project-patterns`, `architecture-decisions` |
+| **implementer** | `api-conventions`, `error-handling`, `testing-patterns` |
+| **reviewer** | `security-checklist`, `performance-patterns`, `code-quality` |
+| **orchestrator** | `pro-workflow`, `project-patterns` |
+| **debugger** | `debugging-techniques`, `common-bugs` |
+
+## Multiple Skills
+
+Agents can preload multiple skills:
+
+```yaml
+---
+name: full-stack-agent
+skills:
+  - "frontend-patterns"
+  - "backend-patterns"
+  - "database-patterns"
+  - "testing-patterns"
+---
+
+Agent with full-stack knowledge.
+```
+
+<Warning>
+  Each skill uses context tokens. Limit to 3-5 skills per agent to avoid context bloat.
+</Warning>
+
+## Skill vs On-Demand
+
+### Agent Skills (Preloaded)
+
+```yaml
+# In agent frontmatter
+skills: ["api-conventions"]
+```
+
+**Pros:**
+- Always available
+- No invocation needed
+- Consistent behavior
+
+**Cons:**
+- Uses context tokens at startup
+- Can't be conditionally loaded
+
+**Use for:** Domain knowledge the agent always needs.
+
+### On-Demand Skills (Invoked)
+
+```yaml
+# In skill frontmatter
+user-invocable: true
+```
+
+**Pros:**
+- Context loaded only when called
+- Can use `context: fork` for isolation
+- User or agent can invoke
+
+**Cons:**
+- Requires invocation
+- Not available until called
+
+**Use for:** Procedures run occasionally.
+
+## Decision Matrix
+
+| Scenario | Use |
+|----------|-----|
+| Agent always needs this knowledge | Agent skill (preloaded) |
+| User triggers occasionally | On-demand skill |
+| Heavy procedure, don't pollute context | On-demand with `context: fork` |
+| Background-only, never user-facing | `user-invocable: false` |
+
+## Context Management
+
+### Skill Size
+
+<Accordion title="Small Skills (<500 tokens)">
+
+```markdown
+---
+name: naming-conventions
+---
+
+# Naming Conventions
+
+- camelCase for variables
+- PascalCase for classes
+- UPPER_SNAKE_CASE for constants
+- kebab-case for file names
+```
+
+**Cost:** ~50 tokens  
+**Impact:** Minimal
+
+</Accordion>
+
+<Accordion title="Medium Skills (500-2000 tokens)">
+
+```markdown
+---
+name: api-conventions
+---
+
+# API Conventions
+
+[Detailed patterns, examples, error handling]
+```
+
+**Cost:** ~200-500 tokens  
+**Impact:** Moderate (acceptable for frequently-used patterns)
+
+</Accordion>
+
+<Accordion title="Large Skills (>2000 tokens)">
+
+```markdown
+---
+name: complete-architecture-guide
+---
+
+# Complete Architecture Guide
+
+[Extensive documentation with many examples]
+```
+
+**Cost:** >500 tokens  
+**Impact:** High (consider splitting or using on-demand)
+
+</Accordion>
+
+### Optimization
+
+<Steps>
+  <Step title="Use concise language">
+    Remove fluff. Be direct.
+    
+    Bad: "When you are implementing an API endpoint, it is important to remember that you should always validate user input before processing it."
+    
+    Good: "Validate input before processing."
+  </Step>
+  <Step title="Examples over prose">
+    Code examples are more token-efficient than long explanations.
+  </Step>
+  <Step title="Split large skills">
+    Instead of one large skill, create multiple focused skills:
+    - `api-conventions-routes`
+    - `api-conventions-auth`
+    - `api-conventions-errors`
+  </Step>
+  <Step title="Use on-demand for heavy content">
+    Large reference guides should be on-demand skills, not preloaded.
+  </Step>
+</Steps>
+
+## Testing Skills
+
+Verify skill loading:
+
+```bash
+# Check skill exists
+ls .claude/skills/my-skill/SKILL.md
+
+# Validate frontmatter
+head -5 .claude/skills/my-skill/SKILL.md
+
+# Test agent with skill
+cat .claude/agents/my-agent.md | grep 'skills:'
+
+# Invoke agent and check if skill knowledge is applied
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Focused Skills" icon="bullseye">
+    One concern per skill. Better to have 5 small skills than 1 large one.
+  </Card>
+  <Card title="Keep Updated" icon="arrows-rotate">
+    Update skills when patterns change. Agents use outdated knowledge otherwise.
+  </Card>
+  <Card title="Examples Required" icon="code">
+    Every pattern needs a code example. Prose alone isn't enough.
+  </Card>
+  <Card title="Limit Per Agent" icon="list-ol">
+    3-5 skills max per agent. More than that bloats context unnecessarily.
+  </Card>
+</CardGroup>
+
+## Skill Templates
+
+<Accordion title="Project Patterns">
+
+```markdown
+---
+name: project-patterns
+description: Common patterns in this project
+---
+
+# Project Patterns
+
+## Directory Structure
+
+[Explain structure]
+
+## Common Patterns
+
+### Pattern 1
+
+[Description]
+
+```typescript
+[Example]
+```
+
+### Pattern 2
+
+[Description]
+
+```typescript
+[Example]
+```
+
+## Anti-Patterns
+
+- Don't do X
+- Don't do Y
+```
+
+</Accordion>
+
+<Accordion title="API Conventions">
+
+```markdown
+---
+name: api-conventions
+description: REST API design patterns
+---
+
+# API Conventions
+
+## Naming
+
+- Endpoints: plural nouns (`/users`, not `/user`)
+- Properties: camelCase
+- HTTP methods: GET, POST, PUT, DELETE
+
+## Authentication
+
+[Auth pattern with example]
+
+## Error Responses
+
+[Error format with example]
+
+## Pagination
+
+[Pagination pattern with example]
+```
+
+</Accordion>
+
+<Accordion title="Security Checklist">
+
+```markdown
+---
+name: security-checklist
+description: Security items to verify
+---
+
+# Security Checklist
+
+## Input Validation
+
+- [ ] Item 1
+- [ ] Item 2
+
+## Authentication
+
+- [ ] Item 1
+- [ ] Item 2
+
+## Secrets Management
+
+- [ ] Item 1
+- [ ] Item 2
+```
+
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Skills API" icon="sparkles" href="/api/skills/frontmatter">
+    Create custom skills
+  </Card>
+  <Card title="Agent Frontmatter" icon="file" href="/api/agents/frontmatter">
+    Complete agent configuration
+  </Card>
+  <Card title="Agent Memory" icon="database" href="/api/agents/memory">
+    Configure persistent memory
+  </Card>
+  <Card title="Skill Preloading" icon="bolt" href="/api/skills/preloading">
+    Advanced skill loading patterns
+  </Card>
+</CardGroup>

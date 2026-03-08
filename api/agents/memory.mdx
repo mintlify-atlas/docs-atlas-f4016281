@@ -1,0 +1,394 @@
+---
+title: Agent Memory
+description: Configure persistent memory scope for agents
+---
+
+Agent memory controls what an agent remembers across sessions. Use memory scopes to give agents project-specific recall, user-wide patterns, or ephemeral session-only context.
+
+## Memory Scopes
+
+<ParamField path="memory" type="string">
+  Memory scope for the agent. Values:
+  - `user`: User-wide memory (default)
+  - `project`: Project-scoped memory
+  - `local`: Session-only memory (ephemeral)
+</ParamField>
+
+### User Memory (Default)
+
+```yaml
+---
+name: my-agent
+memory: user
+---
+
+Agent recalls patterns from all projects for this user.
+```
+
+**Scope:** `~/.claude/memory/<agent-name>/`
+
+**Use for:**
+- General coding patterns
+- Language-specific best practices
+- User preferences
+
+**Example:** A reviewer agent with user memory remembers your coding style across all projects.
+
+### Project Memory
+
+```yaml
+---
+name: orchestrator
+memory: project
+---
+
+Agent recalls patterns from previous sessions in this project only.
+```
+
+**Scope:** `.claude/memory/<agent-name>/`
+
+**Use for:**
+- Project-specific patterns
+- Architecture decisions
+- Team conventions
+
+**Example:** An orchestrator agent with project memory remembers how you structured features in past sessions.
+
+### Local Memory (Ephemeral)
+
+```yaml
+---
+name: temp-explorer
+memory: local
+---
+
+Agent memory is session-only. Nothing persists.
+```
+
+**Scope:** Session context only (no file storage)
+
+**Use for:**
+- One-time tasks
+- Sensitive data exploration
+- Temporary analysis
+
+**Example:** A scout agent with local memory explores a competitor's repo without storing findings.
+
+## Memory vs Skills
+
+| Feature | Memory | Skills |
+|---------|--------|--------|
+| **Content** | Learned from sessions | Explicitly defined |
+| **Persistence** | Automatic | Manual |
+| **Scope** | User or project | Global (same for everyone) |
+| **Update** | Agent learns over time | Developer updates |
+| **Size** | Grows with use | Fixed per skill |
+
+<Info>
+  Memory and skills work together. Skills provide baseline knowledge, memory captures project-specific learnings.
+</Info>
+
+## How Memory Works
+
+1. **Session Start:** Agent loads memory from scope
+2. **During Session:** Agent observes patterns, corrections, decisions
+3. **Session End:** Agent updates memory with new learnings
+4. **Next Session:** Agent recalls previous patterns
+
+<Note>
+  Memory is stored as structured data in SQLite (via the learnings database) or as markdown in the memory directory.
+</Note>
+
+## Memory with Learnings Database
+
+Integrate agent memory with the Pro Workflow database:
+
+```yaml
+---
+name: orchestrator
+memory: project
+skills: ["pro-workflow"]
+---
+
+# Orchestrator
+
+At session start:
+1. Load project learnings from database
+2. Recall previous feature builds
+3. Apply learned patterns
+
+At session end:
+4. Save corrections as learnings
+5. Update `times_applied` for used patterns
+```
+
+### Loading Learnings
+
+```typescript
+// In SessionStart hook
+import { createStore } from 'pro-workflow';
+
+const store = createStore();
+const projectName = process.env.PROJECT_NAME;
+const learnings = store.getAllLearnings(projectName);
+
+// Inject into agent context
+const memoryContent = learnings
+  .map(l => `[${l.category}] ${l.rule}`)
+  .join('\n');
+
+console.log('Memory loaded:', memoryContent);
+store.close();
+```
+
+### Saving Learnings
+
+```typescript
+// In SessionEnd hook or via [LEARN] tags
+import { createStore } from 'pro-workflow';
+
+const store = createStore();
+
+store.addLearning({
+  project: process.env.PROJECT_NAME,
+  category: 'Architecture',
+  rule: 'Split large components into smaller ones',
+  mistake: 'Created 500-line component',
+  correction: 'Extracted 3 sub-components'
+});
+
+store.close();
+```
+
+## Memory Precedence
+
+When agent has multiple memory sources:
+
+1. **Session context** (current conversation)
+2. **Project memory** (this project's history)
+3. **User memory** (cross-project patterns)
+4. **Skills** (explicit knowledge)
+
+<Tip>
+  More specific memory takes precedence. Project memory overrides user memory when they conflict.
+</Tip>
+
+## Examples
+
+### Orchestrator with Project Memory
+
+```yaml
+---
+name: orchestrator
+description: Multi-phase development with project memory
+tools: ["Read", "Glob", "Grep", "Bash", "Edit", "Write"]
+skills: ["pro-workflow"]
+model: opus
+memory: project
+---
+
+# Orchestrator
+
+Recalls from previous sessions:
+- How we structured features
+- What testing approach we use
+- Which files typically change together
+- Past mistakes and corrections
+
+Applies learned patterns to new features.
+```
+
+**Memory Location:** `.claude/memory/orchestrator/`
+
+### Debugger with User Memory
+
+```yaml
+---
+name: debugger
+description: Systematic debugging with user memory
+tools: ["Read", "Grep", "Bash"]
+model: opus
+memory: user
+---
+
+# Debugger
+
+Recalls from all projects:
+- Common bug patterns (off-by-one, null checks, race conditions)
+- Debugging techniques that worked
+- Tools and commands that help
+
+Applies cross-project debugging knowledge.
+```
+
+**Memory Location:** `~/.claude/memory/debugger/`
+
+### Temp Explorer with Local Memory
+
+```yaml
+---
+name: temp-explorer
+description: One-time exploration with no persistence
+tools: ["Read", "Glob", "Grep"]
+model: haiku
+memory: local
+permissionMode: auto
+---
+
+# Temp Explorer
+
+Explore without storing findings.
+Memory is session-only.
+```
+
+**Memory Location:** None (ephemeral)
+
+## Memory Management
+
+### Viewing Memory
+
+```bash
+# Project memory
+cat .claude/memory/orchestrator/memory.md
+
+# User memory
+cat ~/.claude/memory/reviewer/memory.md
+
+# Via database
+sqlite3 ~/.pro-workflow/data.db \
+  "SELECT * FROM learnings WHERE project = '$(basename $PWD)' ORDER BY created_at DESC LIMIT 10;"
+```
+
+### Clearing Memory
+
+```bash
+# Clear project memory for agent
+rm -rf .claude/memory/orchestrator/
+
+# Clear user memory for agent
+rm -rf ~/.claude/memory/reviewer/
+
+# Clear database learnings for project
+sqlite3 ~/.pro-workflow/data.db \
+  "DELETE FROM learnings WHERE project = '$(basename $PWD)';"
+```
+
+<Warning>
+  Clearing memory is irreversible. Export learnings first if you want a backup.
+</Warning>
+
+### Exporting Memory
+
+```bash
+# Export project learnings
+sqlite3 ~/.pro-workflow/data.db \
+  "SELECT * FROM learnings WHERE project = '$(basename $PWD)';" \
+  > learnings-export.csv
+
+# Export as JSON
+node -e "
+const { createStore } = require('pro-workflow');
+const store = createStore();
+const learnings = store.getAllLearnings('$(basename $PWD)');
+console.log(JSON.stringify(learnings, null, 2));
+store.close();
+" > learnings.json
+```
+
+## Memory Hooks
+
+Automate memory management with hooks:
+
+<Accordion title="SessionStart: Load Memory">
+
+```bash
+#!/bin/bash
+# hooks/session-start.sh
+
+AGENT_NAME="$1"
+PROJECT_NAME=$(basename "$PWD")
+
+if [[ "$AGENT_NAME" == "orchestrator" ]]; then
+  node -e "
+  const { createStore } = require('pro-workflow');
+  const store = createStore();
+  const learnings = store.getAllLearnings('$PROJECT_NAME');
+  
+  if (learnings.length > 0) {
+    console.log('Loaded ' + learnings.length + ' learnings for ' + '$AGENT_NAME');
+    for (const l of learnings.slice(0, 5)) {
+      console.log('  - [' + l.category + '] ' + l.rule);
+    }
+  }
+  
+  store.close();
+  "
+fi
+```
+
+</Accordion>
+
+<Accordion title="SessionEnd: Save Memory">
+
+```bash
+#!/bin/bash
+# hooks/session-end.sh
+
+AGENT_NAME="$1"
+LAST_MESSAGE="$2"
+
+# Extract [LEARN] blocks from last message
+echo "$LAST_MESSAGE" | grep -o '\[LEARN\] [^:]*: .*' | while read -r learning; do
+  CATEGORY=$(echo "$learning" | sed 's/\[LEARN\] \([^:]*\):.*/\1/')
+  RULE=$(echo "$learning" | sed 's/\[LEARN\] [^:]*: \(.*\)/\1/')
+  
+  node -e "
+  const { createStore } = require('pro-workflow');
+  const store = createStore();
+  store.addLearning({
+    project: '$(basename $PWD)',
+    category: '$CATEGORY',
+    rule: '$RULE',
+    mistake: null,
+    correction: null
+  });
+  store.close();
+  "
+done
+```
+
+</Accordion>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Match Scope to Use" icon="target">
+    Project patterns → project memory. General patterns → user memory.
+  </Card>
+  <Card title="Combine with Skills" icon="layer-group">
+    Use skills for baseline, memory for project-specific learning.
+  </Card>
+  <Card title="Review Periodically" icon="calendar">
+    Check memory content quarterly. Remove outdated patterns.
+  </Card>
+  <Card title="Export Before Reset" icon="download">
+    Backup memory before clearing. You might want it later.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Agent Skills" icon="brain" href="/api/agents/skills">
+    Preload domain knowledge
+  </Card>
+  <Card title="Learnings API" icon="database" href="/api/database/learnings">
+    Store and query learnings
+  </Card>
+  <Card title="Hooks" icon="link" href="/guides/hooks/session-lifecycle">
+    Automate memory management
+  </Card>
+  <Card title="Agent Frontmatter" icon="file" href="/api/agents/frontmatter">
+    Complete agent configuration
+  </Card>
+</CardGroup>

@@ -1,0 +1,383 @@
+---
+title: /wrap-up
+description: End-of-session ritual with change audit and learning capture
+---
+
+# /wrap-up Command
+
+End your Claude Code session with intention. The `/wrap-up` command runs a comprehensive checklist to audit changes, verify quality, capture learnings, and prepare for the next session.
+
+## Syntax
+
+```bash
+/wrap-up
+```
+
+No arguments required.
+
+<Note>
+The `/wrap-up` command is a ritual, not just a checklist. Make it habitual at the end of every session.
+</Note>
+
+## The 5-Step Checklist
+
+<Steps>
+  <Step title="Changes Audit">
+    Review all modified files:
+    
+    ```bash
+    git status
+    git diff --stat
+    ```
+    
+    **Questions:**
+    - What files were modified?
+    - Any uncommitted changes?
+    - Any TODOs left in code?
+    
+    **Action:**
+    - Commit or stash uncommitted work
+    - Remove or ticket TODOs
+  </Step>
+  
+  <Step title="Quality Check">
+    Run full quality gates:
+    
+    ```bash
+    npm run lint 2>&1 | head -20
+    npm run typecheck 2>&1 | head -20
+    npm test -- --changed --passWithNoTests
+    ```
+    
+    **Action:**
+    - Fix any failures before ending
+    - Don't leave broken tests
+  </Step>
+  
+  <Step title="Learning Capture">
+    Identify corrections and patterns:
+    
+    **Questions:**
+    - What corrections did you make this session?
+    - Any new patterns learned?
+    - Any mistakes to avoid next time?
+    
+    **Action:**
+    - Format learnings as: `[LEARN] Category: Rule`
+    - Save to database with `/learn-rule`
+  </Step>
+  
+  <Step title="Session Summary">
+    Document what was accomplished:
+    
+    ```text
+    Session Summary
+    ===============
+    Duration: 2h 15m
+    Commits: 4
+    Files changed: 12
+    
+    Completed:
+    - Added rate limiting to login endpoint
+    - Fixed null handling in session middleware
+    - Added tests for auth flows
+    
+    In Progress:
+    - Refactoring database connection pooling (60% done)
+    
+    Next Session:
+    - Complete connection pooling refactor
+    - Add monitoring for rate limiter
+    - Deploy to staging
+    ```
+    
+    **Action:**
+    - Save summary to notes or project log
+    - Create handoff doc if handing off to someone else
+  </Step>
+  
+  <Step title="Context Cleanup">
+    Prepare for next session:
+    
+    **Actions:**
+    - Compact context if >70% full
+    - Clear dead MCP connections
+    - Close unused worktrees
+    
+    ```bash
+    /context  # Check usage
+    /compact  # If >70%
+    ```
+  </Step>
+</Steps>
+
+## Example Flow
+
+```bash
+> /wrap-up
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        PRO WORKFLOW SESSION WRAP-UP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[1/5] Changes Audit
+───────────────────
+
+git status:
+  M src/auth/login.ts
+  M src/auth/session.ts
+  M tests/auth.test.ts
+  
+No uncommitted changes.
+
+TODO check:
+  ✓ No TODOs found
+
+[2/5] Quality Check
+──────────────────
+
+Running lint...
+✓ Lint: PASS
+
+Running typecheck...
+✓ Types: PASS
+
+Running tests...
+✓ Tests: 42/42 PASS (4.2s)
+
+[3/5] Learning Capture
+─────────────────────
+
+Corrections this session:
+  1. Fixed Redis connection handling (retry logic)
+  2. Changed rate limit window from fixed to sliding
+  
+Suggested learnings:
+  [LEARN] Rate Limiting: Use sliding window over fixed window for smoother rate limiting
+  [LEARN] Redis: Always implement retry logic with exponential backoff
+  
+Save these learnings? (y/n)
+> y
+
+✓ Saved 2 learnings to database
+
+[4/5] Session Summary
+────────────────────
+
+Session Stats:
+  Duration: 2h 15m
+  Commits: 4
+  Files changed: 12
+  Corrections: 2
+  Context usage: 67%
+  
+Completed:
+  ✓ Added rate limiting to login endpoint
+  ✓ Fixed null handling in session middleware
+  ✓ Added comprehensive auth tests
+  
+Next Session:
+  → Complete connection pooling refactor (60% done)
+  → Add monitoring for rate limiter
+  → Deploy to staging environment
+  
+[5/5] Context Cleanup
+────────────────────
+
+Context usage: 67% (healthy)
+✓ No cleanup needed
+
+MCP connections:
+  ✓ 8 active servers (healthy)
+  
+Worktrees:
+  ✓ 1 active worktree
+  
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        WRAP-UP COMPLETE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Good session! See you next time.
+```
+
+## Configuration
+
+Wrap-up behavior is configurable in `config.json`:
+
+```json
+{
+  "wrap_up": {
+    "check_uncommitted": true,
+    "verify_tests": true,
+    "update_claude_md": true,
+    "create_summary": true
+  }
+}
+```
+
+### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `check_uncommitted` | `true` | Check for uncommitted changes |
+| `verify_tests` | `true` | Run quality gates |
+| `update_claude_md` | `true` | Suggest CLAUDE.md updates |
+| `create_summary` | `true` | Generate session summary |
+
+## When to Use /wrap-up
+
+<Tabs>
+  <Tab title="Always">
+    **End of every session:**
+    - Before closing Claude Code
+    - After completing a feature
+    - Before switching to different work
+    - At the end of the workday
+    
+    Make it habitual. Rituals compound.
+  </Tab>
+  
+  <Tab title="Especially After">
+    **After significant work:**
+    - Multi-file refactors
+    - Completing `/develop` workflow
+    - Fixing production bugs
+    - Learning new patterns
+    
+    More corrections = more learnings to capture.
+  </Tab>
+  
+  <Tab title="Before">
+    **Before transitions:**
+    - Handing off to teammate
+    - Switching to different project
+    - Starting context-heavy work
+    - Breaking for lunch/end of day
+    
+    Clean slate for next session.
+  </Tab>
+</Tabs>
+
+## Integration with Hooks
+
+Wrap-up integrates with the hook system:
+
+### SessionEnd Hook
+
+Auto-run wrap-up when closing Claude Code:
+
+```json
+{
+  "hooks": {
+    "SessionEnd": {
+      "script": "${CLAUDE_PLUGIN_ROOT}/scripts/auto-wrap-up.js"
+    }
+  }
+}
+```
+
+### PreToolUse Hook
+
+Remind about wrap-up before git push:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": {
+      "Bash": {
+        "matcher": "git push",
+        "message": "Did you run /wrap-up before pushing?"
+      }
+    }
+  }
+}
+```
+
+See [Custom Hooks](/hooks/custom-hooks) for details.
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Make It Habitual" icon="repeat">
+    Run `/wrap-up` at the end of every session, no exceptions. Rituals compound over time.
+  </Card>
+  <Card title="Capture All Learnings" icon="brain">
+    Don't skip learning capture. Every correction is a future improvement.
+  </Card>
+  <Card title="Fix Before Closing" icon="wrench">
+    Don't leave broken tests or failing quality gates. Fix before wrap-up completes.
+  </Card>
+  <Card title="Document Next Steps" icon="clipboard">
+    Always note what's next. Future you (or your teammate) will thank you.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Quality gates fail during wrap-up">
+    If quality gates fail:
+    
+    1. Fix the failures before ending:
+       ```bash
+       npm run lint -- --fix
+       npm run typecheck
+       npm test
+       ```
+    
+    2. If hotfix needed, skip gates:
+       ```bash
+       /wrap-up --no-verify
+       ```
+    
+    3. Create TODO to fix later:
+       ```typescript
+       // TODO(you): Fix flaky test before next session
+       ```
+  </Accordion>
+  
+  <Accordion title="Context usage is high">
+    If context >70% during wrap-up:
+    
+    1. Run compact:
+       ```bash
+       /compact
+       ```
+    
+    2. Or start fresh session:
+       - Save handoff doc first
+       - Close and restart Claude Code
+       - Resume from handoff
+  </Accordion>
+  
+  <Accordion title="No learnings to capture">
+    If no corrections were made:
+    
+    - That's fine! Not every session has learnings
+    - Focus on documenting what was completed
+    - Note patterns observed for future reference
+  </Accordion>
+</AccordionGroup>
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="/learn-rule" icon="brain" href="/commands/learn-rule">
+    Capture specific learning rule
+  </Card>
+  <Card title="/handoff" icon="hand" href="/commands/handoff">
+    Generate detailed handoff document
+  </Card>
+  <Card title="/insights" icon="chart-line" href="/commands/insights">
+    View session analytics
+  </Card>
+  <Card title="Wrap-Up Skill" icon="check-double" href="/skills/wrap-up">
+    Deep dive on wrap-up patterns
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+- Learn about [Learning System](/concepts/self-correction-loop)
+- Set up [Auto Wrap-Up Hook](/hooks/custom-hooks)
+- Configure [Quality Gates](/configuration/quality-gates)

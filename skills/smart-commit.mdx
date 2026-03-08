@@ -1,0 +1,473 @@
+---
+title: 'Smart Commit'
+description: 'Run quality gates, review staged changes for issues, and create well-crafted conventional commits'
+icon: 'code-commit'
+---
+
+## Overview
+
+Smart Commit automates quality checks and creates well-crafted conventional commits. It runs lint, typecheck, and tests on affected files, scans for common issues, and drafts meaningful commit messages.
+
+## Trigger
+
+Use when:
+- Saying "commit", "save changes", or "ready to commit"
+- After making changes and ready to persist
+- Before pushing to remote
+
+<CodeGroup>
+```bash Claude Code
+/commit
+/pro-workflow:commit
+```
+
+```bash Cursor
+# Skill is available automatically
+"commit these changes"
+```
+</CodeGroup>
+
+## Workflow
+
+<Steps>
+  <Step title="Check Current State">
+    Identify what files have changed and what to commit
+    
+    ```bash
+    git status
+    git diff --stat
+    ```
+  </Step>
+  
+  <Step title="Run Quality Gates">
+    Lint, typecheck, and test affected files
+    
+    ```bash
+    npm run lint 2>&1 | tail -5
+    npm run typecheck 2>&1 | tail -5
+    npm test -- --changed --passWithNoTests 2>&1 | tail -10
+    ```
+  </Step>
+  
+  <Step title="Scan Staged Changes">
+    Review code for issues before committing
+  </Step>
+  
+  <Step title="Draft Commit Message">
+    Generate conventional commit from the diff
+  </Step>
+  
+  <Step title="Stage and Commit">
+    Stage specific files by name and create the commit
+    
+    ```bash
+    git add <specific files>
+    git commit -m "<type>(<scope>): <summary>"
+    ```
+  </Step>
+  
+  <Step title="Prompt for Learnings">
+    Ask if there are any learnings to capture from this change
+  </Step>
+</Steps>
+
+## Code Review Scan
+
+Before committing, Smart Commit checks staged changes for:
+
+<AccordionGroup>
+  <Accordion title="Debug Statements" icon="bug">
+    - `console.log` / `console.debug` / `console.warn`
+    - `debugger` statements
+    - `print()` / `println()` in Python/Java
+    - `fmt.Println()` in Go
+    - `dbg!()` in Rust
+  </Accordion>
+  
+  <Accordion title="TODO Comments" icon="list-check">
+    - TODO/FIXME/HACK comments without ticket references
+    - Example: `// TODO: fix this` ❌
+    - Example: `// TODO(#123): fix auth logic` ✅
+  </Accordion>
+  
+  <Accordion title="Secrets & Keys" icon="key">
+    - Hardcoded API keys or tokens
+    - Database credentials
+    - Private keys or certificates
+    - AWS/GCP/Azure credentials
+  </Accordion>
+  
+  <Accordion title="Test-Only Code" icon="vial">
+    - `it.only()` / `describe.only()`
+    - `fit()` / `fdescribe()` in Jasmine
+    - `test.only()` in Jest
+    - Leftover test fixtures in production code
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+If any issues are found, Smart Commit flags them before proceeding. You must fix or explicitly approve.
+</Warning>
+
+## Commit Message Format
+
+Smart Commit uses conventional commit format:
+
+```text
+<type>(<scope>): <short summary>
+
+<body - what changed and why>
+```
+
+### Types
+
+| Type | When to Use | Example |
+|------|-------------|----------|
+| `feat` | New feature | `feat(auth): add OAuth2 support` |
+| `fix` | Bug fix | `fix(api): handle null user response` |
+| `refactor` | Code restructuring | `refactor(db): extract query helpers` |
+| `test` | Test changes | `test(auth): add login edge cases` |
+| `docs` | Documentation | `docs(api): update endpoint examples` |
+| `chore` | Maintenance | `chore(deps): upgrade to Next.js 14` |
+| `perf` | Performance | `perf(query): add index on user_id` |
+| `ci` | CI/CD changes | `ci(actions): add deploy workflow` |
+| `style` | Formatting | `style(lint): fix ESLint warnings` |
+
+### Scope
+
+Optional. Use the affected module or feature area:
+- `(auth)`, `(api)`, `(ui)`, `(db)`, `(payments)`
+- If change affects entire project, omit scope: `feat: add health check endpoint`
+
+### Summary
+
+- Under 72 characters
+- Lowercase, no period at end
+- Imperative mood: "add" not "added" or "adds"
+- Focus on **what** changed, not **how**
+
+### Body
+
+Optional but recommended for non-trivial changes:
+- Explain **why** the change was needed
+- Reference issue numbers: `Fixes #123` or `Closes #456`
+- Describe trade-offs or alternative approaches considered
+
+<CodeGroup>
+```text Good Example
+feat(auth): add rate limiting to login endpoint
+
+Prevents brute-force attacks by limiting to 5 login attempts
+per IP per minute. Uses Redis for distributed rate limiting.
+
+Fixes #234
+```
+
+```text Bad Example
+fix bug
+
+fixed the thing that was broken
+```
+</CodeGroup>
+
+## Guardrails
+
+<Warning>
+**Never skip quality gates** unless user explicitly says to.
+</Warning>
+
+### Staging Rules
+
+- **Stage specific files by name.** Never `git add -A` or `git add .`
+- Verify each file is intentionally staged
+- Exclude generated files, lock files, or unrelated changes
+
+### Message Rules
+
+- Summary under 72 characters
+- Body explains *why*, not *what*
+- No generic messages: "fix bug", "update code", "changes"
+- Reference issue numbers when applicable
+
+### Quality Gates
+
+If quality gates fail:
+1. Show the errors
+2. Ask if you should fix them or commit anyway
+3. Never proceed without acknowledgment
+
+## Output
+
+Smart Commit provides:
+
+<Steps>
+  <Step title="Quality Gate Results">
+    ```text
+    ✓ Lint: passed (0 errors, 2 warnings)
+    ✓ Typecheck: passed
+    ✓ Tests: 15 passed, 0 failed
+    ```
+  </Step>
+  
+  <Step title="Issues Found">
+    ```text
+    Issues in staged changes:
+    ⚠️ src/api/auth.ts:42 - console.log left in code
+    ⚠️ src/utils/db.ts:15 - TODO without ticket reference
+    ```
+  </Step>
+  
+  <Step title="Suggested Commit Message">
+    ```text
+    Suggested commit:
+    
+    feat(auth): add OAuth2 provider support
+    
+    Implements Google and GitHub OAuth2 login flows.
+    Adds new /auth/oauth/callback endpoint and provider
+    configuration in environment variables.
+    
+    Fixes #145
+    ```
+  </Step>
+  
+  <Step title="Commit Hash">
+    ```text
+    ✓ Committed: a3f5c21 feat(auth): add OAuth2 provider support
+    ```
+  </Step>
+  
+  <Step title="Learning Prompt">
+    ```text
+    Any learnings to capture from this change?
+    (e.g., "Remember to test OAuth flows in incognito mode")
+    ```
+  </Step>
+</Steps>
+
+## Examples
+
+### Example 1: Feature Commit
+
+```bash
+User: "commit these changes"
+
+Claude:
+1. Checking current state...
+   Modified: src/api/users.ts, src/types/user.ts, tests/api/users.test.ts
+
+2. Running quality gates...
+   ✓ Lint: passed
+   ✓ Typecheck: passed
+   ✓ Tests: 23 passed
+
+3. Scanning staged changes...
+   ✓ No issues found
+
+4. Suggested commit:
+   
+   feat(api): add user profile update endpoint
+   
+   Allows users to update their profile information via
+   PATCH /api/users/:id. Validates email format and prevents
+   username changes.
+   
+   Fixes #89
+
+5. Staging and committing...
+   git add src/api/users.ts src/types/user.ts tests/api/users.test.ts
+   git commit -m "feat(api): add user profile update endpoint..."
+   
+   ✓ Committed: b7d4e92
+
+Any learnings to capture? (e.g., validation patterns, API design decisions)
+```
+
+### Example 2: Quality Gate Failure
+
+```bash
+User: "commit"
+
+Claude:
+1. Checking current state...
+   Modified: src/components/Button.tsx
+
+2. Running quality gates...
+   ✗ Lint: 3 errors
+   
+   src/components/Button.tsx:12:5
+     Missing semicolon
+   
+   src/components/Button.tsx:18:3
+     'className' is defined but never used
+
+   ✓ Typecheck: passed
+   ✓ Tests: 5 passed
+
+Lint errors must be fixed before committing. Should I:
+1. Fix the lint errors
+2. Commit anyway (not recommended)
+```
+
+### Example 3: Issues Found
+
+```bash
+User: "ready to commit"
+
+Claude:
+1-2. [Checking state and quality gates...] ✓
+
+3. Scanning staged changes...
+   ⚠️ Issues found:
+   
+   src/api/auth.ts:42
+     console.log('user:', user)
+     → Debug statement should be removed
+   
+   src/utils/helpers.ts:15
+     // TODO: refactor this
+     → TODO without ticket reference
+
+Would you like me to:
+1. Remove the console.log and fix the TODO
+2. Commit anyway with these issues
+3. Skip these files from the commit
+```
+
+## Integration with Pro Workflow
+
+Smart Commit works seamlessly with other skills:
+
+<CardGroup cols={2}>
+  <Card title="Wrap-Up" icon="check-circle" href="/skills/wrap-up">
+    Wrap-up calls Smart Commit as part of end-of-session ritual
+  </Card>
+  <Card title="Learn Rule" icon="graduation-cap" href="/skills/learn-rule">
+    Capture lessons after committing (e.g., "Always test edge cases")
+  </Card>
+  <Card title="Orchestrate" icon="diagram-project" href="/skills/orchestrate">
+    Multi-phase development ends with Smart Commit
+  </Card>
+  <Card title="Deslop" icon="broom" href="/skills/deslop">
+    Run deslop before Smart Commit to clean up AI bloat
+  </Card>
+</CardGroup>
+
+## Configuration
+
+### Custom Quality Gates
+
+Override default quality commands in your CLAUDE.md:
+
+```markdown
+## Quality Gates
+
+Before commits:
+- Lint: `npm run lint -- --max-warnings 0`
+- Types: `tsc --noEmit`
+- Tests: `npm test -- --coverage --changedSince=origin/main`
+- Security: `npm audit --audit-level=moderate`
+```
+
+### Skip Specific Checks
+
+Temporarily skip checks (not recommended):
+
+```bash
+# Skip tests (emergency fixes only)
+claude --set SKIP_TESTS=true
+
+# Skip lint (never recommended)
+claude --set SKIP_LINT=true
+```
+
+<Warning>
+Skipping quality gates should be rare. Capture as a learning if you do it.
+</Warning>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Commit Often" icon="clock">
+    Small, focused commits are easier to review and revert. Aim for one logical change per commit.
+  </Accordion>
+  
+  <Accordion title="Feature Branches" icon="code-branch">
+    Always work on feature branches, never directly on main/master.
+    
+    ```bash
+    git checkout -b feat/add-oauth
+    # make changes
+    /commit
+    git push -u origin feat/add-oauth
+    ```
+  </Accordion>
+  
+  <Accordion title="Atomic Commits" icon="atom">
+    Each commit should be self-contained:
+    - Builds successfully
+    - Tests pass
+    - Can be deployed independently (when possible)
+  </Accordion>
+  
+  <Accordion title="Meaningful Messages" icon="message">
+    Future you (and teammates) will thank you:
+    - **Good**: `fix(auth): prevent token refresh race condition`
+    - **Bad**: `fix bug`
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### Quality Gates Take Too Long
+
+```bash
+# Run only affected tests
+npm test -- --changed --onlyChanged
+
+# Or set a timeout
+npm test -- --testTimeout=5000
+```
+
+### Lint Errors on Generated Code
+
+Exclude generated files in `.gitignore` and lint config:
+
+```json
+// .eslintrc.json
+{
+  "ignorePatterns": ["dist/", "*.generated.ts", "node_modules/"]
+}
+```
+
+### Commit Message Too Long
+
+Move details to the body:
+
+```text
+feat(api): add webhook retry logic
+
+Implements exponential backoff with jitter for webhook
+delivery failures. Retries up to 5 times with delays:
+1s, 2s, 4s, 8s, 16s. Marks webhook as failed after
+all retries exhausted.
+
+Fixes #234
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Learn Wrap-Up Ritual" icon="check-circle" href="/skills/wrap-up">
+    End sessions properly with learning capture
+  </Card>
+  <Card title="Try Deslop" icon="broom" href="/skills/deslop">
+    Clean up AI-generated code bloat before committing
+  </Card>
+  <Card title="Master Orchestrate" icon="diagram-project" href="/skills/orchestrate">
+    Build features through structured phases
+  </Card>
+  <Card title="View All Skills" icon="puzzle-piece" href="/skills/overview">
+    Explore the complete skill system
+  </Card>
+</CardGroup>

@@ -1,0 +1,443 @@
+---
+title: Search API
+description: Full-text search with BM25 ranking and filters
+---
+
+The Search API provides fast, ranked full-text search over learnings using SQLite's FTS5 engine with BM25 scoring. Search by keywords, categories, or projects with sub-millisecond performance.
+
+## SearchResult Interface
+
+```typescript
+export interface SearchResult extends Learning {
+  rank: number;          // BM25 relevance score (lower is better)
+  snippet?: string;      // Highlighted match excerpt
+}
+```
+
+<Info>
+  BM25 is a probabilistic ranking function. Lower scores indicate higher relevance.
+</Info>
+
+## SearchOptions Interface
+
+```typescript
+export interface SearchOptions {
+  limit?: number;        // Max results (default: 10)
+  project?: string;      // Filter by project
+  category?: string;     // Filter by category
+}
+```
+
+## Search Functions
+
+### searchLearnings
+
+<ParamField path="db" type="Database.Database" required>
+  SQLite database instance from `store.db` or `initializeDatabase()`.
+</ParamField>
+
+<ParamField path="query" type="string" required>
+  Search query. Supports prefix matching, phrases, and boolean operators.
+</ParamField>
+
+<ParamField path="options" type="SearchOptions" default="{}">
+  Optional filters for limit, project, and category.
+</ParamField>
+
+<ResponseField name="return" type="SearchResult[]">
+  Array of learnings ranked by BM25 relevance with highlighted snippets.
+</ResponseField>
+
+<CodeGroup>
+
+```typescript Basic Search
+import { createStore, searchLearnings } from 'pro-workflow';
+
+const store = createStore();
+
+const results = searchLearnings(store.db, 'testing', { limit: 5 });
+
+for (const result of results) {
+  console.log(`#${result.id} [${result.category}] ${result.rule}`);
+  console.log(`  Rank: ${result.rank}`);
+  if (result.snippet) {
+    console.log(`  Match: ${result.snippet}`);
+  }
+}
+
+store.close();
+```
+
+```typescript Filtered Search
+const results = searchLearnings(store.db, 'commit', {
+  category: 'Git',
+  project: 'my-app',
+  limit: 3
+});
+```
+
+```typescript Phrase Search
+const results = searchLearnings(store.db, '"run tests"');
+// Finds exact phrase "run tests"
+```
+
+</CodeGroup>
+
+## Query Syntax
+
+### Prefix Matching
+
+All terms are automatically prefix-matched:
+
+```typescript
+searchLearnings(store.db, 'test');
+// Matches: "testing", "tests", "test-driven", etc.
+```
+
+### Phrase Search
+
+Use quotes for exact phrases:
+
+```typescript
+searchLearnings(store.db, '"git commit"');
+// Matches only exact phrase "git commit"
+```
+
+### Multiple Terms (OR)
+
+Space-separated terms are OR'd:
+
+```typescript
+searchLearnings(store.db, 'git commit push');
+// Matches learnings containing ANY of: git, commit, push
+```
+
+### Wildcards
+
+Use `*` for explicit wildcards:
+
+```typescript
+searchLearnings(store.db, 'test*');
+// Matches: test, testing, tests, etc.
+```
+
+<Note>
+  Prefix matching is applied automatically, so wildcards are rarely needed.
+</Note>
+
+## BM25 Tuning
+
+The search query uses custom BM25 weights:
+
+```typescript
+bm25(learnings_fts, 1.0, 2.0, 1.0, 1.0)
+//                   ^    ^    ^    ^
+//                   |    |    |    └─ correction weight
+//                   |    |    └────── mistake weight
+//                   |    └─────────── rule weight (2x)
+//                   └──────────────── category weight
+```
+
+<Tip>
+  The `rule` field has 2x weight because it's the primary searchable field.
+</Tip>
+
+## Specialized Search Functions
+
+### searchByCategory
+
+<ParamField path="db" type="Database.Database" required>
+  SQLite database instance.
+</ParamField>
+
+<ParamField path="category" type="string" required>
+  Category name (e.g., `"Testing"`, `"Git"`).
+</ParamField>
+
+<ParamField path="options" type="SearchOptions" default="{}">
+  Optional filters for limit and project.
+</ParamField>
+
+<ResponseField name="return" type="Learning[]">
+  Learnings in the category, sorted by `times_applied DESC, created_at DESC`.
+</ResponseField>
+
+```typescript
+import { createStore, searchByCategory } from 'pro-workflow';
+
+const store = createStore();
+const testingLearnings = searchByCategory(store.db, 'Testing', { limit: 10 });
+
+store.close();
+```
+
+<Info>
+  This bypasses FTS and uses a direct category lookup. Faster for category-only queries.
+</Info>
+
+### getRelatedLearnings
+
+<ParamField path="db" type="Database.Database" required>
+  SQLite database instance.
+</ParamField>
+
+<ParamField path="learningId" type="number" required>
+  Learning ID to find related learnings for.
+</ParamField>
+
+<ParamField path="limit" type="number" default="5">
+  Maximum number of related learnings to return.
+</ParamField>
+
+<ResponseField name="return" type="SearchResult[]">
+  Learnings related to the specified learning, excluding the learning itself.
+</ResponseField>
+
+<CodeGroup>
+
+```typescript Related Learnings
+import { createStore, getRelatedLearnings } from 'pro-workflow';
+
+const store = createStore();
+const related = getRelatedLearnings(store.db, 42, 5);
+
+for (const learning of related) {
+  console.log(`Related: ${learning.rule}`);
+}
+
+store.close();
+```
+
+```typescript Algorithm
+// Extract keywords from the original learning's rule
+// Search for learnings matching those keywords
+// Fallback to same-category learnings if no keyword matches
+```
+
+</CodeGroup>
+
+### getMostAppliedLearnings
+
+<ParamField path="db" type="Database.Database" required>
+  SQLite database instance.
+</ParamField>
+
+<ParamField path="limit" type="number" default="10">
+  Maximum number of learnings to return.
+</ParamField>
+
+<ResponseField name="return" type="Learning[]">
+  Learnings with `times_applied > 0`, sorted by `times_applied DESC, created_at DESC`.
+</ResponseField>
+
+```typescript
+import { createStore, getMostAppliedLearnings } from 'pro-workflow';
+
+const store = createStore();
+const topLearnings = getMostAppliedLearnings(store.db, 10);
+
+console.log('Most applied learnings:');
+for (const learning of topLearnings) {
+  console.log(`  ${learning.rule} (${learning.times_applied}x)`);
+}
+
+store.close();
+```
+
+<Tip>
+  Use this to surface frequently-applied patterns. Great for onboarding or session handoffs.
+</Tip>
+
+### getRecentLearnings
+
+<ParamField path="db" type="Database.Database" required>
+  SQLite database instance.
+</ParamField>
+
+<ParamField path="limit" type="number" default="10">
+  Maximum number of learnings to return.
+</ParamField>
+
+<ParamField path="project" type="string | undefined">
+  Filter by project. Omit for all learnings.
+</ParamField>
+
+<ResponseField name="return" type="Learning[]">
+  Learnings sorted by `created_at DESC`.
+</ResponseField>
+
+```typescript
+import { createStore, getRecentLearnings } from 'pro-workflow';
+
+const store = createStore();
+const recent = getRecentLearnings(store.db, 5, 'my-app');
+
+store.close();
+```
+
+## Snippet Highlighting
+
+Snippets show 32 tokens of context with matches highlighted:
+
+```typescript
+const results = searchLearnings(store.db, 'test');
+for (const result of results) {
+  console.log(result.snippet);
+  // Example: "Always run <mark>tests</mark> before committing..."
+}
+```
+
+<Note>
+  Snippets use `<mark>` tags. Strip or convert to ANSI codes for CLI display.
+</Note>
+
+## Performance
+
+### FTS5 Index
+
+The `learnings_fts` virtual table indexes:
+- `category`
+- `rule`
+- `mistake`
+- `correction`
+
+Updates are automatic via triggers (no manual sync required).
+
+### Query Performance
+
+| Operation | Time |
+|-----------|------|
+| Simple query (1 term) | &lt;1ms |
+| Complex query (3+ terms) | &lt;5ms |
+| Filtered query (project + category) | &lt;10ms |
+| Full table scan (no FTS) | 10-100ms |
+
+<Tip>
+  For best performance, use FTS queries (`searchLearnings`) instead of `SELECT * WHERE rule LIKE '%term%'`.
+</Tip>
+
+## CLI Examples
+
+<CodeGroup>
+
+```bash Search from CLI
+# Search learnings
+node -e "
+const { createStore, searchLearnings } = require('pro-workflow');
+const store = createStore();
+const results = searchLearnings(store.db, 'testing', { limit: 5 });
+for (const r of results) {
+  console.log('#' + r.id + ': ' + r.rule);
+}
+store.close();
+"
+```
+
+```bash Raw SQL
+# Direct FTS query
+sqlite3 ~/.pro-workflow/data.db \
+  "SELECT id, category, rule, bm25(learnings_fts) as rank \
+   FROM learnings \
+   JOIN learnings_fts ON learnings.id = learnings_fts.rowid \
+   WHERE learnings_fts MATCH 'test*' \
+   ORDER BY rank LIMIT 5;"
+```
+
+```bash Most Applied
+sqlite3 ~/.pro-workflow/data.db \
+  "SELECT rule, times_applied FROM learnings \
+   WHERE times_applied > 0 \
+   ORDER BY times_applied DESC LIMIT 10;"
+```
+
+</CodeGroup>
+
+## Integration Examples
+
+<Accordion title="/search Command">
+
+```markdown commands/search.md
+---
+description: Search learnings by keyword
+argument-hint: <query>
+---
+
+# Search Learnings
+
+Query: $ARGUMENTS
+
+Run this:
+
+\`\`\`bash
+node -e "
+const { createStore, searchLearnings } = require('pro-workflow');
+const store = createStore();
+const results = searchLearnings(store.db, '$ARGUMENTS', { limit: 10 });
+
+if (results.length === 0) {
+  console.log('No learnings found.');
+} else {
+  console.log('Found ' + results.length + ' learnings:\\n');
+  for (const r of results) {
+    console.log('#' + r.id + ' [' + r.category + '] ' + r.rule);
+    if (r.mistake) console.log('  Mistake: ' + r.mistake);
+    console.log('  Applied: ' + r.times_applied + 'x\\n');
+  }
+}
+
+store.close();
+"
+\`\`\`
+```
+
+</Accordion>
+
+<Accordion title="Replay Learnings Skill">
+
+```markdown skills/replay-learnings/SKILL.md
+---
+name: replay-learnings
+description: Surface relevant past learnings for the current task
+---
+
+# Replay Learnings
+
+Ask the user what they're working on, then search for relevant learnings:
+
+\`\`\`typescript
+import { createStore, searchLearnings } from 'pro-workflow';
+
+const store = createStore();
+const task = '<user input>';
+
+const results = searchLearnings(store.db, task, { limit: 5 });
+
+if (results.length > 0) {
+  console.log('Relevant learnings:');
+  for (const r of results) {
+    console.log(`- ${r.rule}`);
+  }
+}
+
+store.close();
+\`\`\`
+```
+
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Learnings API" icon="book" href="/api/database/learnings">
+    CRUD operations for learnings
+  </Card>
+  <Card title="Commands" icon="terminal" href="/api/commands/frontmatter">
+    Build search commands
+  </Card>
+  <Card title="Skills" icon="sparkles" href="/api/skills/discovery">
+    Create searchable skills
+  </Card>
+  <Card title="Agents" icon="robot" href="/api/agents/memory">
+    Preload search results into agents
+  </Card>
+</CardGroup>

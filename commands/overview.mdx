@@ -1,0 +1,198 @@
+---
+title: Commands Overview
+description: Complete reference for all Pro Workflow slash commands
+---
+
+# Commands Overview
+
+Pro Workflow provides 11 powerful slash commands for managing your AI coding workflow. Commands are available in Claude Code (with `/pro-workflow:` prefix) and Cursor (as shortcuts).
+
+## All Commands
+
+<CardGroup cols={2}>
+  <Card title="/develop" icon="code" href="/commands/develop">
+    Multi-phase feature development with Research > Plan > Implement > Review workflow
+  </Card>
+  <Card title="/doctor" icon="stethoscope" href="/commands/doctor">
+    Health check for your pro-workflow setup and configuration
+  </Card>
+  <Card title="/commit" icon="code-commit" href="/commands/commit">
+    Smart commit with quality gates and conventional message format
+  </Card>
+  <Card title="/wrap-up" icon="check-double" href="/commands/wrap-up">
+    End-of-session ritual with change audit and learning capture
+  </Card>
+  <Card title="/learn-rule" icon="brain" href="/commands/learn-rule">
+    Capture corrections as persistent learning rules
+  </Card>
+  <Card title="/handoff" icon="hand" href="/commands/handoff">
+    Generate session handoff document for continuity
+  </Card>
+  <Card title="/insights" icon="chart-line" href="/commands/insights">
+    Session analytics, correction trends, and productivity metrics
+  </Card>
+  <Card title="/replay" icon="rotate-left" href="/commands/replay">
+    Surface past learnings relevant to current task
+  </Card>
+  <Card title="/search" icon="magnifying-glass" href="/commands/search">
+    Search learnings database with FTS5 full-text search
+  </Card>
+  <Card title="/list" icon="list" href="/commands/list">
+    List all stored learnings from the database
+  </Card>
+  <Card title="/parallel" icon="code-branch" href="/commands/parallel">
+    Set up parallel worktrees for zero dead time
+  </Card>
+</CardGroup>
+
+## Command Categories
+
+### Development Workflow
+
+**Core development commands for building features:**
+
+- **`/develop`** — Multi-phase feature builder (Research > Plan > Implement > Review)
+- **`/commit`** — Smart commit with quality gates
+- **`/doctor`** — Setup health check and diagnostics
+
+### Session Management
+
+**Commands for managing session state:**
+
+- **`/wrap-up`** — End-of-session checklist and audit
+- **`/handoff`** — Generate handoff document for next session
+- **`/parallel`** — Set up parallel worktrees
+
+### Learning System
+
+**Commands for the self-correction loop:**
+
+- **`/learn-rule`** — Capture correction as persistent rule
+- **`/replay`** — Surface relevant past learnings
+- **`/search`** — Full-text search of learnings
+- **`/list`** — List all learnings
+- **`/insights`** — Analytics and correction heatmaps
+
+## Usage in Different Tools
+
+<Tabs>
+  <Tab title="Claude Code">
+    Commands use the plugin namespace:
+    
+    ```bash
+    /pro-workflow:develop add user authentication
+    /pro-workflow:wrap-up
+    /pro-workflow:doctor
+    ```
+    
+    After plugin install, short forms also work:
+    
+    ```bash
+    /develop add user authentication
+    /wrap-up
+    /doctor
+    ```
+  </Tab>
+  
+  <Tab title="Cursor">
+    Commands are available directly:
+    
+    ```bash
+    /develop add user authentication
+    /wrap-up
+    /doctor
+    ```
+    
+    Rules are loaded automatically from `.cursorrules`.
+  </Tab>
+</Tabs>
+
+## Command Patterns
+
+### Commands That Delegate to Agents
+
+Some commands spawn specialized agents:
+
+- **`/develop`** → Spawns `orchestrator` agent for multi-phase workflow
+- Complex commands use agent delegation for constrained execution
+
+### Commands With Arguments
+
+```bash
+/develop <feature description>    # Argument required
+/search <query>                   # Argument required
+/replay <task description>        # Argument optional
+/commit                          # No arguments
+```
+
+### Commands With Options
+
+```bash
+/commit --no-verify              # Skip quality gates
+/commit --amend                  # Amend previous commit
+/handoff --full                  # Include full context
+/handoff --compact               # Minimal handoff
+/insights session                # Session-specific insights
+/insights learnings              # Learning patterns
+```
+
+## Quick Reference
+
+| Command | When to Use | Output |
+|---------|-------------|--------|
+| `/develop` | Building a feature | Structured workflow with phases |
+| `/doctor` | Checking setup | Health report with fixes |
+| `/commit` | Committing changes | Quality-checked commit |
+| `/wrap-up` | Ending session | Session summary + learnings |
+| `/learn-rule` | After correction | Learning saved to database |
+| `/handoff` | Ending session | Handoff document |
+| `/insights` | Reviewing progress | Analytics and trends |
+| `/replay` | Starting task | Relevant past learnings |
+| `/search` | Finding learnings | Search results with ranking |
+| `/list` | Browsing learnings | All learnings listed |
+| `/parallel` | Need parallel work | Worktree setup guide |
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Start every session with /replay">
+    Before diving into a task, run `/replay <task>` to surface relevant learnings from past sessions. This primes Claude with context about similar work.
+  </Accordion>
+  
+  <Accordion title="Use /develop for multi-file features">
+    For features touching 3+ files, use `/develop` instead of implementing directly. The research phase catches edge cases before you write code.
+  </Accordion>
+  
+  <Accordion title="Always /wrap-up before ending">
+    The wrap-up ritual captures learnings and ensures clean git state. Make it habitual.
+  </Accordion>
+  
+  <Accordion title="Run /doctor weekly">
+    Check your setup health weekly. Catch config drift, MCP bloat, and context issues early.
+  </Accordion>
+  
+  <Accordion title="Use /learn-rule after every correction">
+    When you correct Claude, immediately run `/learn-rule` to capture the pattern. This compounds over time.
+  </Accordion>
+</AccordionGroup>
+
+## Integration with Hooks
+
+Commands integrate with the hook system:
+
+- **PreToolUse** hooks can suggest commands (e.g., remind about `/commit` before git push)
+- **PostToolUse** hooks can trigger commands (e.g., run `/learn-rule` after repeated corrections)
+- **SessionEnd** hooks can auto-run `/wrap-up`
+
+See [Hooks Overview](/hooks/overview) for details.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Try /develop" icon="rocket" href="/commands/develop">
+    Build your first feature with the multi-phase workflow
+  </Card>
+  <Card title="Command API" icon="code" href="/api/commands/frontmatter">
+    Learn how to create custom commands
+  </Card>
+</CardGroup>

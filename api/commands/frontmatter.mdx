@@ -1,0 +1,410 @@
+---
+title: Command Frontmatter
+description: Define slash commands with YAML frontmatter and dynamic substitution
+---
+
+Commands in Pro Workflow are markdown files with YAML frontmatter that define slash commands (e.g., `/wrap-up`, `/develop`). They support dynamic string substitution and tool constraints.
+
+## Command Structure
+
+```markdown
+---
+description: What this command does
+argument-hint: <placeholder>
+allowed-tools: ["Read", "Bash"]
+model: opus
+---
+
+# Command Instructions
+
+Command body with dynamic substitution:
+- User input: $ARGUMENTS
+- First word: $ARGUMENTS[0]
+- Session ID: ${CLAUDE_SESSION_ID}
+- Live output: !`git branch --show-current`
+```
+
+## Frontmatter Fields
+
+<ParamField path="description" type="string" required>
+  Short description shown in the `/` command menu. Keep under 80 characters.
+</ParamField>
+
+<ParamField path="argument-hint" type="string">
+  Placeholder text for command arguments. Example: `<feature description>`, `<query>`.
+</ParamField>
+
+<ParamField path="allowed-tools" type="string[]">
+  Tool whitelist for this command. Only these tools will be available during execution.
+  
+  Example: `["Read", "Glob", "Grep"]` for read-only exploration.
+</ParamField>
+
+<ParamField path="model" type="string">
+  Model override for this command. Values: `opus`, `sonnet`, `haiku`.
+</ParamField>
+
+<ParamField path="disallowed-tools" type="string[]">
+  Tool blacklist. Blocks specific tools from being used.
+  
+  Example: `["Edit", "Write"]` for read-only commands.
+</ParamField>
+
+## Dynamic Substitution
+
+### User Arguments
+
+<CodeGroup>
+
+```markdown All Arguments
+# Command: /search testing edge cases
+
+Query: $ARGUMENTS
+# Expands to: testing edge cases
+```
+
+```markdown First Argument
+# Command: /develop add user auth
+
+Feature: $ARGUMENTS[0]
+# Expands to: add
+```
+
+```markdown Index Access
+# Command: /refactor src/auth.ts rename validateUser
+
+File: $ARGUMENTS[0]
+Action: $ARGUMENTS[1]
+Target: $ARGUMENTS[2]
+# Expands to:
+# File: src/auth.ts
+# Action: rename
+# Target: validateUser
+```
+
+</CodeGroup>
+
+### Environment Variables
+
+<CodeGroup>
+
+```markdown Session ID
+Session: ${CLAUDE_SESSION_ID}
+# Expands to: session-abc123
+```
+
+```markdown Project Name
+Project: ${PROJECT_NAME}
+# Expands to: my-app
+```
+
+```markdown Custom Variables
+Database: ${PRO_WORKFLOW_DB_PATH}
+# Expands to: ~/.pro-workflow/data.db
+```
+
+</CodeGroup>
+
+### Live Command Output
+
+Use `` !`command` `` to inject live shell output:
+
+<CodeGroup>
+
+```markdown Git Context
+Current branch: !`git branch --show-current`
+Last commit: !`git log --oneline -1`
+Modified files: !`git diff --name-only`
+
+# Expands to:
+# Current branch: feature/add-auth
+# Last commit: abc123d Add login endpoint
+# Modified files: src/auth.ts
+```
+
+```markdown File Lists
+TypeScript files: !`find src -name '*.ts' | wc -l`
+Test coverage: !`npm test -- --coverage --silent | grep 'Lines'`
+```
+
+</CodeGroup>
+
+<Warning>
+  Live commands execute immediately when the command is invoked. Avoid slow operations.
+</Warning>
+
+## Tool Constraints
+
+### Read-Only Commands
+
+```yaml
+---
+description: Explore code without making changes
+allowed-tools: ["Read", "Glob", "Grep", "Bash"]
+---
+
+Explore the codebase:
+1. Find all TypeScript files
+2. Read key interfaces
+3. Summarize architecture
+
+Do NOT edit any files.
+```
+
+### Edit-Only Commands
+
+```yaml
+---
+description: Apply automated refactoring
+allowed-tools: ["Read", "Edit"]
+---
+
+Refactor all files matching pattern:
+1. Read each file
+2. Apply transformation
+3. Verify syntax
+
+Do NOT run tests or git commands.
+```
+
+### Blocked Tools
+
+```yaml
+---
+description: Safe exploration for untrusted tasks
+disallowed-tools: ["Bash", "Write"]
+---
+
+Explore safely:
+- Can read files
+- Can search
+- Cannot execute shell commands
+- Cannot create new files
+```
+
+## Model Selection
+
+<CodeGroup>
+
+```yaml Opus for Planning
+---
+description: Break down complex task into plan
+model: opus
+allowed-tools: ["Read", "Glob", "Grep"]
+---
+
+Analyze the task and create a detailed plan.
+```
+
+```yaml Haiku for Quick Tasks
+---
+description: List all learnings
+model: haiku
+---
+
+Show all learnings from the database.
+```
+
+</CodeGroup>
+
+## Examples
+
+<Accordion title="/wrap-up Command">
+
+```markdown
+---
+description: End-of-session ritual with quality checks
+allowed-tools: ["Read", "Bash"]
+---
+
+# Wrap-Up Ritual
+
+Session: ${CLAUDE_SESSION_ID}
+Branch: !`git branch --show-current`
+
+## Checklist
+
+1. **Changes Audit**
+   - Modified files: !`git diff --name-only`
+   - Uncommitted: !`git status --short`
+
+2. **Quality Check**
+   - Lint: !`npm run lint 2>&1 | head -5`
+   - Tests: !`npm test -- --changed --passWithNoTests`
+
+3. **Learning Capture**
+   - What mistakes were made?
+   - What patterns worked?
+   - Format: `[LEARN] Category: Rule`
+
+4. **Summary**
+   - One paragraph: what was accomplished, current state, next steps
+```
+
+</Accordion>
+
+<Accordion title="/develop Command">
+
+```markdown
+---
+description: Build a feature using Research > Plan > Implement phases
+argument-hint: <feature description>
+model: opus
+---
+
+# Multi-Phase Feature Development
+
+Feature: $ARGUMENTS
+
+## Phase 1: Research
+
+Explore the codebase to understand scope:
+1. Find relevant files
+2. Check dependencies
+3. Score confidence (0-100)
+
+**Decision:**
+- Score >= 70 → Move to Phase 2
+- Score < 70 → Gather more context
+
+## Phase 2: Plan
+
+Present plan for approval:
+
+```
+PLAN: $ARGUMENTS
+
+Goal: [one sentence]
+
+Files to modify:
+1. path/file.ts - [changes]
+
+Approach:
+1. [step]
+
+Risks:
+- [potential issue]
+```
+
+**Wait for approval before Phase 3.**
+
+## Phase 3: Implement
+
+1. Make changes in plan order
+2. Run tests after each file
+3. Pause for review every 5 edits
+4. Run quality gates at end
+```
+
+</Accordion>
+
+<Accordion title="/search Command">
+
+```markdown
+---
+description: Search learnings database
+argument-hint: <query>
+model: haiku
+---
+
+# Search Learnings
+
+Query: $ARGUMENTS
+
+Run this:
+
+\`\`\`bash
+node -e "
+const { createStore, searchLearnings } = require('pro-workflow');
+const store = createStore();
+const results = searchLearnings(store.db, '$ARGUMENTS', { limit: 10 });
+
+if (results.length === 0) {
+  console.log('No learnings found.');
+} else {
+  console.log('Found ' + results.length + ' learnings:\\n');
+  for (const r of results) {
+    console.log('#' + r.id + ' [' + r.category + '] ' + r.rule);
+    if (r.mistake) console.log('  Mistake: ' + r.mistake);
+  }
+}
+
+store.close();
+"
+\`\`\`
+```
+
+</Accordion>
+
+## Command Discovery
+
+Commands are discovered from:
+
+1. **Project:** `.claude/commands/*.md`
+2. **User:** `~/.claude/commands/*.md`
+3. **Plugin:** `~/.claude/plugins/*/commands/*.md`
+
+File name becomes command name:
+- `wrap-up.md` → `/wrap-up`
+- `learn-rule.md` → `/learn-rule`
+
+<Tip>
+  Use hyphens in filenames, not underscores or spaces.
+</Tip>
+
+## Precedence
+
+When multiple commands have the same name:
+
+1. Project (`.claude/commands/`) — highest priority
+2. User (`~/.claude/commands/`)
+3. Plugin (`~/.claude/plugins/*/commands/`) — lowest priority
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Short Descriptions" icon="comment">
+    Keep `description` under 80 characters for clean `/` menu display.
+  </Card>
+  <Card title="Clear Arguments" icon="input-text">
+    Use descriptive `argument-hint` like `<feature description>`, not `<input>`.
+  </Card>
+  <Card title="Constrain Tools" icon="lock">
+    Use `allowed-tools` to enforce read-only or specific tool access.
+  </Card>
+  <Card title="Live Context" icon="bolt">
+    Use `` !`command` `` sparingly. Slow commands delay invocation.
+  </Card>
+</CardGroup>
+
+## Validation
+
+Test your command:
+
+```bash
+# Validate frontmatter
+yq eval '.description' commands/my-command.md
+
+# Test substitution
+echo "User input: test" | sed 's/test/$ARGUMENTS/'
+
+# Invoke command
+/my-command test argument
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Arguments" icon="brackets-curly" href="/api/commands/arguments">
+    Advanced argument parsing and validation
+  </Card>
+  <Card title="Delegation" icon="share-nodes" href="/api/commands/delegation">
+    Delegate commands to agents
+  </Card>
+  <Card title="Agents" icon="robot" href="/api/agents/frontmatter">
+    Create agents for command execution
+  </Card>
+  <Card title="Skills" icon="sparkles" href="/api/skills/frontmatter">
+    Preload skills into commands
+  </Card>
+</CardGroup>

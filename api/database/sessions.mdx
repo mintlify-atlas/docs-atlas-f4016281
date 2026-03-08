@@ -1,0 +1,356 @@
+---
+title: Sessions API
+description: Track and query session activity and analytics
+---
+
+The Sessions API tracks metadata for each coding session, including edit counts, corrections, and prompts. Use it to analyze productivity patterns and session quality.
+
+## Session Interface
+
+```typescript
+export interface Session {
+  id: string;                    // Session identifier (e.g., CLAUDE_SESSION_ID)
+  project: string | null;        // Project name
+  started_at: string;            // ISO 8601 timestamp
+  ended_at: string | null;       // ISO 8601 timestamp (null if active)
+  edit_count: number;            // Number of Edit/Write tool uses
+  corrections_count: number;     // Number of corrections made
+  prompts_count: number;         // Number of user prompts
+}
+```
+
+<Note>
+  Session IDs should be unique per session. Use `process.env.CLAUDE_SESSION_ID` in Claude Code or generate your own UUID.
+</Note>
+
+## Store Methods
+
+### startSession
+
+<ParamField path="id" type="string" required>
+  Unique session identifier. Use `CLAUDE_SESSION_ID` or generate a UUID.
+</ParamField>
+
+<ParamField path="project" type="string | undefined">
+  Project name for this session. Omit for sessions without a project context.
+</ParamField>
+
+<ResponseField name="return" type="Session">
+  The created session with `started_at` auto-populated.
+</ResponseField>
+
+<Info>
+  If a session with the same ID already exists, this is a no-op (uses `INSERT OR IGNORE`).
+</Info>
+
+<CodeGroup>
+
+```typescript Start Session
+import { createStore } from 'pro-workflow';
+
+const store = createStore();
+const sessionId = process.env.CLAUDE_SESSION_ID || `session-${Date.now()}`;
+
+const session = store.startSession(sessionId, 'my-app');
+console.log(`Session started at ${session.started_at}`);
+
+store.close();
+```
+
+```typescript Hook Integration
+// In a SessionStart hook
+import { createStore } from 'pro-workflow';
+
+const store = createStore();
+const sessionId = process.env.CLAUDE_SESSION_ID;
+const projectName = process.env.PROJECT_NAME || null;
+
+store.startSession(sessionId, projectName);
+store.close();
+```
+
+</CodeGroup>
+
+### endSession
+
+<ParamField path="id" type="string" required>
+  Session ID to end. Sets `ended_at` to current timestamp.
+</ParamField>
+
+<ResponseField name="return" type="void">
+  No return value. The session is marked as ended.
+</ResponseField>
+
+```typescript
+store.endSession(sessionId);
+console.log('Session ended');
+```
+
+<Tip>
+  Call this in a SessionEnd hook or `/wrap-up` command to track session duration.
+</Tip>
+
+### getSession
+
+<ParamField path="id" type="string" required>
+  Session ID to retrieve.
+</ParamField>
+
+<ResponseField name="return" type="Session | undefined">
+  The session if found, otherwise `undefined`.
+</ResponseField>
+
+```typescript
+const session = store.getSession(sessionId);
+if (session) {
+  console.log(`Edits: ${session.edit_count}`);
+  console.log(`Corrections: ${session.corrections_count}`);
+}
+```
+
+### updateSessionCounts
+
+<ParamField path="id" type="string" required>
+  Session ID to update.
+</ParamField>
+
+<ParamField path="edits" type="number" default="0">
+  Number of edits to add to `edit_count`.
+</ParamField>
+
+<ParamField path="corrections" type="number" default="0">
+  Number of corrections to add to `corrections_count`.
+</ParamField>
+
+<ParamField path="prompts" type="number" default="0">
+  Number of prompts to add to `prompts_count`.
+</ParamField>
+
+<ResponseField name="return" type="void">
+  No return value. Counts are incremented atomically.
+</ResponseField>
+
+<Warning>
+  This method **adds** to existing counts. It does not set absolute values.
+</Warning>
+
+<CodeGroup>
+
+```typescript Track Activity
+const store = createStore();
+const sessionId = process.env.CLAUDE_SESSION_ID;
+
+// After an edit
+store.updateSessionCounts(sessionId, 1, 0, 0);
+
+// After a correction
+store.updateSessionCounts(sessionId, 0, 1, 0);
+
+// After a user prompt
+store.updateSessionCounts(sessionId, 0, 0, 1);
+
+store.close();
+```
+
+```typescript Hook Integration
+// In a PostToolUse hook
+import { createStore } from 'pro-workflow';
+
+const store = createStore();
+const sessionId = process.env.CLAUDE_SESSION_ID;
+
+if (toolName === 'Edit' || toolName === 'Write') {
+  store.updateSessionCounts(sessionId, 1, 0, 0);
+}
+
+store.close();
+```
+
+</CodeGroup>
+
+### getRecentSessions
+
+<ParamField path="limit" type="number" default="10">
+  Maximum number of sessions to return.
+</ParamField>
+
+<ResponseField name="return" type="Session[]">
+  Array of sessions sorted by `started_at DESC` (most recent first).
+</ResponseField>
+
+```typescript
+const recentSessions = store.getRecentSessions(5);
+
+for (const session of recentSessions) {
+  console.log(`${session.id}: ${session.edit_count} edits, ${session.corrections_count} corrections`);
+}
+```
+
+## Analytics Queries
+
+Use the store API or raw SQL for custom analytics.
+
+<CodeGroup>
+
+```typescript Average Edits Per Session
+import { createStore } from 'pro-workflow';
+
+const store = createStore();
+
+const result = store.db.prepare(`
+  SELECT AVG(edit_count) as avg_edits
+  FROM sessions
+  WHERE ended_at IS NOT NULL
+`).get() as { avg_edits: number };
+
+console.log(`Average edits per session: ${result.avg_edits.toFixed(1)}`);
+store.close();
+```
+
+```typescript Sessions by Project
+const result = store.db.prepare(`
+  SELECT project, COUNT(*) as session_count, SUM(edit_count) as total_edits
+  FROM sessions
+  GROUP BY project
+  ORDER BY session_count DESC
+`).all();
+
+console.log(result);
+```
+
+```typescript Correction Rate
+const result = store.db.prepare(`
+  SELECT
+    SUM(corrections_count) * 1.0 / SUM(edit_count) as correction_rate
+  FROM sessions
+  WHERE edit_count > 0
+`).get() as { correction_rate: number };
+
+console.log(`Correction rate: ${(result.correction_rate * 100).toFixed(1)}%`);
+```
+
+```sql CLI Queries
+-- Active sessions
+sqlite3 ~/.pro-workflow/data.db \
+  "SELECT id, project, started_at FROM sessions WHERE ended_at IS NULL;"
+
+-- Top 5 longest sessions
+sqlite3 ~/.pro-workflow/data.db \
+  "SELECT id, project, 
+          ROUND((julianday(ended_at) - julianday(started_at)) * 24, 2) as hours 
+   FROM sessions 
+   WHERE ended_at IS NOT NULL 
+   ORDER BY hours DESC LIMIT 5;"
+
+-- Productivity by project
+sqlite3 ~/.pro-workflow/data.db \
+  "SELECT project, 
+          COUNT(*) as sessions,
+          AVG(edit_count) as avg_edits,
+          AVG(corrections_count) as avg_corrections
+   FROM sessions
+   GROUP BY project;"
+```
+
+</CodeGroup>
+
+## Integration Examples
+
+<Accordion title="SessionStart Hook">
+
+```bash hooks/session-start.sh
+#!/bin/bash
+# Track session start
+
+SESSION_ID="$CLAUDE_SESSION_ID"
+PROJECT_NAME=$(basename "$PWD")
+
+node -e "
+const { createStore } = require('pro-workflow');
+const store = createStore();
+store.startSession('$SESSION_ID', '$PROJECT_NAME');
+store.close();
+"
+```
+
+</Accordion>
+
+<Accordion title="PostToolUse Hook">
+
+```bash hooks/post-tool-use.sh
+#!/bin/bash
+# Track edits and corrections
+
+TOOL_NAME="$1"
+OUTPUT="$2"
+SESSION_ID="$CLAUDE_SESSION_ID"
+
+if [[ "$TOOL_NAME" == "Edit" ]] || [[ "$TOOL_NAME" == "Write" ]]; then
+  node -e "
+  const { createStore } = require('pro-workflow');
+  const store = createStore();
+  store.updateSessionCounts('$SESSION_ID', 1, 0, 0);
+  store.close();
+  "
+fi
+
+if [[ "$OUTPUT" == *"[LEARN]"* ]]; then
+  node -e "
+  const { createStore } = require('pro-workflow');
+  const store = createStore();
+  store.updateSessionCounts('$SESSION_ID', 0, 1, 0);
+  store.close();
+  "
+fi
+```
+
+</Accordion>
+
+<Accordion title="SessionEnd Hook">
+
+```bash hooks/session-end.sh
+#!/bin/bash
+# Track session end and show summary
+
+SESSION_ID="$CLAUDE_SESSION_ID"
+
+node -e "
+const { createStore } = require('pro-workflow');
+const store = createStore();
+
+const session = store.getSession('$SESSION_ID');
+if (session) {
+  console.log('\\nSession Summary:');
+  console.log('  Edits: ' + session.edit_count);
+  console.log('  Corrections: ' + session.corrections_count);
+  console.log('  Prompts: ' + session.prompts_count);
+  
+  const rate = session.edit_count > 0
+    ? (session.corrections_count / session.edit_count * 100).toFixed(1)
+    : 0;
+  console.log('  Correction rate: ' + rate + '%');
+}
+
+store.endSession('$SESSION_ID');
+store.close();
+"
+```
+
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Learnings API" icon="brain" href="/api/database/learnings">
+    Store corrections from sessions
+  </Card>
+  <Card title="Agents" icon="robot" href="/api/agents/memory">
+    Use session memory in agents
+  </Card>
+  <Card title="Commands" icon="terminal" href="/api/commands/frontmatter">
+    Build session-aware commands
+  </Card>
+  <Card title="Insights Skill" icon="chart-line" href="/guides/skills/insights">
+    Visualize session analytics
+  </Card>
+</CardGroup>

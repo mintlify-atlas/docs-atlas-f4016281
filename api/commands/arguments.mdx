@@ -1,0 +1,429 @@
+---
+title: Command Arguments
+description: Parse, validate, and use command arguments with advanced patterns
+---
+
+Command arguments in Pro Workflow support array access, validation, defaults, and conditional logic. Master argument handling for robust commands.
+
+## Basic Usage
+
+<CodeGroup>
+
+```markdown All Arguments
+# Command: /search testing edge cases
+
+$ARGUMENTS
+# Result: testing edge cases
+```
+
+```markdown Array Access
+# Command: /refactor src/auth.ts rename validateUser
+
+$ARGUMENTS[0]  # src/auth.ts
+$ARGUMENTS[1]  # rename
+$ARGUMENTS[2]  # validateUser
+```
+
+```markdown Range Access
+# Command: /commit feat add user authentication
+
+$ARGUMENTS[0]      # feat
+$ARGUMENTS[1:]     # add user authentication
+$ARGUMENTS[1:3]    # add user
+```
+
+</CodeGroup>
+
+## Validation Patterns
+
+### Required Arguments
+
+```markdown
+---
+description: Refactor a file
+argument-hint: <file> <action> <target>
+---
+
+# Refactor Command
+
+File: $ARGUMENTS[0]
+Action: $ARGUMENTS[1]
+Target: $ARGUMENTS[2]
+
+Validation:
+- If any argument is missing, ask the user for clarification
+- File must exist (use Read tool to verify)
+- Action must be one of: rename, extract, inline, move
+```
+
+### Optional Arguments
+
+```markdown
+---
+description: Search learnings
+argument-hint: <query> [category] [project]
+---
+
+# Search Learnings
+
+Query: $ARGUMENTS[0] (required)
+Category: $ARGUMENTS[1] (optional, filter by category)
+Project: $ARGUMENTS[2] (optional, filter by project)
+
+If category or project not provided, search all.
+```
+
+### Default Values
+
+```markdown
+---
+description: Run tests with coverage
+argument-hint: [pattern]
+---
+
+# Run Tests
+
+Pattern: $ARGUMENTS[0] or "**/*.test.ts" if not provided
+
+\`\`\`bash
+PATTERN="${ARGUMENTS[0]:-**/*.test.ts}"
+npm test -- "$PATTERN" --coverage
+\`\`\`
+```
+
+## Argument Parsing
+
+### Quoted Strings
+
+Quoted arguments are treated as single values:
+
+```bash
+# Command invocation
+/search "run tests before commit"
+
+# In command
+$ARGUMENTS      # "run tests before commit"
+$ARGUMENTS[0]   # "run tests before commit"
+```
+
+### Multiple Words
+
+```bash
+# Without quotes
+/search run tests before commit
+
+$ARGUMENTS      # run tests before commit
+$ARGUMENTS[0]   # run
+$ARGUMENTS[1]   # tests
+$ARGUMENTS[2]   # before
+```
+
+### Flags and Options
+
+```markdown
+---
+description: Advanced search with flags
+argument-hint: <query> [--category=X] [--project=Y] [--limit=N]
+---
+
+# Search with Flags
+
+Parse arguments:
+
+\`\`\`bash
+QUERY="$ARGUMENTS[0]"
+CATEGORY=""
+PROJECT=""
+LIMIT=10
+
+for arg in $ARGUMENTS[1:]; do
+  case $arg in
+    --category=*) CATEGORY="${arg#*=}" ;;
+    --project=*)  PROJECT="${arg#*=}" ;;
+    --limit=*)    LIMIT="${arg#*=}" ;;
+  esac
+done
+\`\`\`
+```
+
+## Conditional Logic
+
+### Argument Count
+
+```markdown
+---
+description: Flexible commit command
+argument-hint: [type] [message]
+---
+
+# Smart Commit
+
+If 0 arguments:
+  - Auto-generate commit message from git diff
+
+If 1 argument:
+  - Type: "feat"
+  - Message: $ARGUMENTS[0]
+
+If 2+ arguments:
+  - Type: $ARGUMENTS[0]
+  - Message: $ARGUMENTS[1:]
+
+Examples:
+- /commit → auto-generate
+- /commit "add auth" → feat: add auth
+- /commit fix "resolve login bug" → fix: resolve login bug
+```
+
+### Argument Validation
+
+```markdown
+---
+description: Create a new agent
+argument-hint: <name> <description>
+---
+
+# Create Agent
+
+Name: $ARGUMENTS[0]
+Description: $ARGUMENTS[1:]
+
+Validation:
+1. Check name format (lowercase, hyphens only)
+2. Check if agent already exists
+3. Validate description is not empty
+
+If validation fails, show error and exit.
+```
+
+## Environment Variable Substitution
+
+<CodeGroup>
+
+```markdown Session Context
+---
+description: Show session info
+---
+
+# Session Info
+
+Session ID: ${CLAUDE_SESSION_ID}
+Project: ${PROJECT_NAME}
+User: ${USER}
+Working Dir: ${PWD}
+```
+
+```markdown Database Path
+---
+description: Initialize database
+---
+
+# Database Init
+
+Database: ${PRO_WORKFLOW_DB_PATH:-~/.pro-workflow/data.db}
+
+\`\`\`bash
+DB_PATH="${PRO_WORKFLOW_DB_PATH:-~/.pro-workflow/data.db}"
+node -e "require('pro-workflow').initializeDatabase('$DB_PATH')"
+\`\`\`
+```
+
+```markdown Custom Variables
+---
+description: Deploy to environment
+argument-hint: [environment]
+---
+
+# Deploy
+
+Environment: ${ARGUMENTS[0]:-${DEPLOY_ENV:-staging}}
+
+Deploy to: $ARGUMENTS[0] or $DEPLOY_ENV or "staging"
+```
+
+</CodeGroup>
+
+## Advanced Patterns
+
+### Multi-Command Dispatch
+
+```markdown
+---
+description: Database operations
+argument-hint: <operation> [...args]
+---
+
+# Database CLI
+
+Operation: $ARGUMENTS[0]
+Args: $ARGUMENTS[1:]
+
+Dispatch based on operation:
+
+- **init**: Initialize database
+- **add**: Add learning ($ARGUMENTS[1] = category, $ARGUMENTS[2:] = rule)
+- **search**: Search ($ARGUMENTS[1:] = query)
+- **list**: List all ($ARGUMENTS[1] = category filter)
+- **stats**: Show statistics
+
+Examples:
+- /db init
+- /db add Testing "Run tests before commit"
+- /db search authentication
+- /db list Git
+- /db stats
+```
+
+### File Path Expansion
+
+```markdown
+---
+description: Edit multiple files
+argument-hint: <pattern>
+---
+
+# Bulk Edit
+
+Pattern: $ARGUMENTS[0]
+
+Expand pattern to file list:
+
+\`\`\`bash
+PATTERN="$ARGUMENTS[0]"
+FILES=$(find . -name "$PATTERN" -type f)
+
+for file in $FILES; do
+  echo "Editing: $file"
+  # Apply transformation
+done
+\`\`\`
+
+Example:
+/bulk-edit "*.test.ts"
+```
+
+### Interactive Argument Collection
+
+```markdown
+---
+description: Create new feature
+argument-hint: [feature-name]
+---
+
+# Create Feature
+
+Feature name: $ARGUMENTS[0]
+
+If not provided, ask:
+  "What feature are you building?"
+
+Then ask:
+  "Which files will this touch? (comma-separated)"
+  "Any dependencies to install?"
+  "Should I create tests?"
+
+Collect all inputs before proceeding.
+```
+
+## Escaping and Special Characters
+
+### Quotes in Arguments
+
+```bash
+# Single quotes
+/search 'console.log'
+
+# Double quotes
+/search "error: 'not found'"
+
+# Escaped quotes
+/search "error: \"not found\""
+```
+
+### Paths with Spaces
+
+```bash
+# Quoted path
+/refactor "src/my component/index.ts" rename MyComponent
+
+# In command
+$ARGUMENTS[0]  # src/my component/index.ts
+```
+
+## Error Handling
+
+```markdown
+---
+description: Safe command with validation
+argument-hint: <required> [optional]
+---
+
+# Safe Command
+
+Validate arguments:
+
+\`\`\`bash
+if [ -z "$ARGUMENTS[0]" ]; then
+  echo "Error: Missing required argument"
+  echo "Usage: /safe <required> [optional]"
+  exit 1
+fi
+
+if [ ! -f "$ARGUMENTS[0]" ]; then
+  echo "Error: File not found: $ARGUMENTS[0]"
+  exit 1
+fi
+\`\`\`
+
+Proceed only if validation passes.
+```
+
+## Testing Arguments
+
+```bash
+# Test command with various inputs
+/my-command test
+/my-command "test with spaces"
+/my-command test arg1 arg2
+/my-command
+
+# Debug argument parsing
+echo "Arguments: $ARGUMENTS"
+echo "Count: ${#ARGUMENTS[@]}"
+echo "First: $ARGUMENTS[0]"
+echo "Rest: $ARGUMENTS[1:]"
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Validate Early" icon="shield-check">
+    Check arguments at the start. Fail fast with clear error messages.
+  </Card>
+  <Card title="Document Examples" icon="book">
+    Show usage examples in the command description or body.
+  </Card>
+  <Card title="Use Defaults" icon="sliders">
+    Provide sensible defaults for optional arguments.
+  </Card>
+  <Card title="Quote Paths" icon="quote-right">
+    Always quote file paths that might contain spaces.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Delegation" icon="share-nodes" href="/api/commands/delegation">
+    Pass arguments to agents
+  </Card>
+  <Card title="Frontmatter" icon="heading" href="/api/commands/frontmatter">
+    Command configuration options
+  </Card>
+  <Card title="Agents" icon="robot" href="/api/agents/frontmatter">
+    Create agents that accept arguments
+  </Card>
+  <Card title="Examples" icon="code" href="/guides/commands/examples">
+    Real-world command examples
+  </Card>
+</CardGroup>

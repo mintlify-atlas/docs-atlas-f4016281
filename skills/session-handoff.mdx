@@ -1,0 +1,488 @@
+---
+title: 'Session Handoff'
+description: 'Generate structured handoff document capturing progress, decisions, and context for resuming work'
+icon: 'hand-holding-hand'
+---
+
+## Overview
+
+Session Handoff generates a structured document capturing your current progress, open tasks, key decisions, and context needed to resume work smoothly.
+
+<Note>
+**Different from wrap-up.** Wrap-up is a checklist for *you*. Handoff is a document written for the *next session*.
+</Note>
+
+## Trigger
+
+Use when:
+- Ending a session and planning to continue later
+- Saying "continue later", "save progress", "session summary"
+- Wanting to "pick up where I left off" tomorrow
+- Handing off work to another developer
+- Context switching to another project
+
+<CodeGroup>
+```bash Claude Code
+/handoff
+/pro-workflow:handoff
+```
+
+```bash Cursor
+# Skill is available automatically
+"generate a session handoff"
+"create handoff document"
+```
+</CodeGroup>
+
+## Workflow
+
+<Steps>
+  <Step title="Gather Current State">
+    Collect git and project state
+    
+    ```bash
+    git status
+    git diff --stat
+    git log --oneline -5
+    git branch --show-current
+    ```
+  </Step>
+  
+  <Step title="List Work Status">
+    Categorize work into:
+    - Completed (done this session)
+    - In-progress (started but not finished)
+    - Pending (planned but not started)
+  </Step>
+  
+  <Step title="Note Key Decisions">
+    Document decisions made and their reasoning:
+    - Architecture choices
+    - Trade-offs considered
+    - Patterns chosen
+  </Step>
+  
+  <Step title="Capture Learnings">
+    Include any learnings from this session
+  </Step>
+  
+  <Step title="Generate Resume Command">
+    Create a copy-pasteable command for next session
+  </Step>
+</Steps>
+
+## Output Format
+
+```markdown
+# Session Handoff — [date] [time]
+
+## Status
+- **Branch**: feature/xyz
+- **Commits this session**: 3
+- **Uncommitted changes**: 2 files modified
+- **Tests**: passing / failing / not run
+
+## What's Done
+- [completed task 1]
+- [completed task 2]
+
+## What's In Progress
+- [current task with context on where you stopped]
+- [file:line that needs attention next]
+
+## What's Pending
+- [next task that hasn't been started]
+- [blocked items with reason]
+
+## Key Decisions Made
+- [decision 1 and why]
+- [decision 2 and why]
+
+## Learnings Captured
+- [Category] Rule (from this session)
+
+## Files Touched
+- `path/to/file1.ts` — [what changed]
+- `path/to/file2.ts` — [what changed]
+
+## Gotchas for Next Session
+- [thing that tripped you up]
+- [non-obvious behavior discovered]
+
+## Resume Command
+> Continue working on [branch]. [1-2 sentence context]. Next step: [specific action].
+```
+
+## Examples
+
+### Example 1: Feature Development
+
+```bash
+User: "Generate a handoff for this session"
+
+Claude: Generating session handoff...
+
+# Session Handoff — 2026-03-08 14:30
+
+## Status
+- **Branch**: feat/webhook-retry
+- **Commits this session**: 2
+  - a3f5c21 feat(webhooks): add retry logic with exponential backoff
+  - b7d4e92 test(webhooks): add retry test cases
+- **Uncommitted changes**: 1 file modified (src/config/webhooks.ts)
+- **Tests**: 23 passed, 0 failed
+
+## What's Done
+✓ Implemented webhook retry logic with exponential backoff
+✓ Added test coverage for retry scenarios
+✓ Configured retry delays: 1s, 2s, 4s, 8s, 16s
+✓ Added webhook status tracking (pending, sent, failed)
+
+## What's In Progress
+- Webhook configuration in src/config/webhooks.ts:15
+  → Need to add retry count validation (max 10)
+  → Need to add timeout configuration
+
+## What's Pending
+- Add webhook dashboard UI to show retry status
+- Add webhook logs table to database
+- Update API documentation
+- Deploy to staging for testing
+
+## Key Decisions Made
+
+1. **Exponential backoff with jitter**
+   Why: Prevents thundering herd when many webhooks fail simultaneously.
+   Implemented fixed delays + random jitter (0-500ms).
+
+2. **Max 5 retries**
+   Why: Balance between delivery reliability and resource usage.
+   After 5 failures (total ~31 seconds), mark as permanently failed.
+
+3. **Store full request/response**
+   Why: Debugging failed webhooks requires seeing exact payload.
+   Trade-off: More storage, but worth it for observability.
+
+## Learnings Captured
+
+- [Testing] Mock setTimeout in retry tests to avoid slow tests (applied immediately)
+- [Architecture] Store webhook attempts in separate table, not as JSON in main table
+
+## Files Touched
+
+- `src/lib/webhooks.ts` — Added retry logic with exponential backoff
+- `src/lib/webhooks.test.ts` — Added 8 test cases for retry scenarios
+- `src/config/webhooks.ts` — Started configuration (in progress)
+- `src/types/webhook.ts` — Added WebhookAttempt type
+
+## Gotchas for Next Session
+
+- Don't forget to add database migration for webhook_attempts table
+- The retry logic uses `setTimeout`, won't work in serverless (need queue)
+- Webhook signatures need to be recalculated on retry (not implemented yet)
+
+## Resume Command
+
+> Continue working on feat/webhook-retry branch. Webhook retry logic implemented and tested. 
+> Next step: Complete webhook configuration validation in src/config/webhooks.ts:15 (retry count and timeout).
+
+Handoff saved to .claude/handoff-2026-03-08.md
+```
+
+### Example 2: Bug Investigation
+
+```bash
+User: "Create handoff, I need to step away"
+
+Claude: Creating handoff...
+
+# Session Handoff — 2026-03-08 16:45
+
+## Status
+- **Branch**: bugfix/auth-race-condition
+- **Commits this session**: 0 (investigation only)
+- **Uncommitted changes**: None
+- **Tests**: Not applicable (investigation phase)
+
+## What's Done
+✓ Reproduced the auth race condition locally
+✓ Identified root cause: token refresh and API call race
+✓ Reviewed 3 potential solutions
+
+## What's In Progress
+
+- Deciding between solution approaches:
+  
+  **Option A: Request queue**
+  - Queue requests during token refresh
+  - Pros: Simple, no breaking changes
+  - Cons: Adds complexity to auth middleware
+  
+  **Option B: Token lock**
+  - Acquire lock before refresh, block other requests
+  - Pros: Cleaner, prevents race at source
+  - Cons: Could block legitimate requests
+  
+  **Option C: Optimistic refresh**
+  - Refresh token proactively before expiry
+  - Pros: Prevents race entirely
+  - Cons: More API calls, complex timing
+
+## What's Pending
+- Choose solution approach (need team input)
+- Implement chosen solution
+- Add regression test
+- Test in staging environment
+
+## Key Decisions Made
+
+1. **Root cause confirmed**
+   Race condition in src/middleware/auth.ts:78-92.
+   Two simultaneous requests both detect expired token,
+   both try to refresh, second refresh fails with 401.
+
+2. **Reproduction case**
+   Created test in tests/auth/race-condition.test.ts that
+   reliably reproduces the issue (previously intermittent).
+
+## Learnings Captured
+
+- [Testing] Use Promise.all() to trigger race conditions reliably in tests
+- [Architecture] Token refresh should be a singleton operation, not per-request
+
+## Files Touched
+
+- `src/middleware/auth.ts` — Investigated token refresh logic (read-only)
+- `tests/auth/race-condition.test.ts` — Created reproduction test case
+- `docs/bugs/auth-race.md` — Documented investigation findings
+
+## Gotchas for Next Session
+
+- The race condition ONLY happens when token expires during a request
+- Must test with very short token expiry (1 second) to reproduce
+- Production logs show this happens ~5 times per day
+- Affects all API endpoints, not just auth endpoints
+
+## Resume Command
+
+> Continue investigating auth race condition on bugfix/auth-race-condition branch.
+> Root cause identified (concurrent token refresh). Three solution options documented.
+> Next step: Choose solution approach (recommend Option A: request queue for simplicity).
+
+Handoff saved to .claude/handoff-2026-03-08-2.md
+```
+
+### Example 3: Incomplete Work
+
+```bash
+User: "Handoff this session"
+
+Claude: Generating handoff...
+
+# Session Handoff — 2026-03-08 18:00
+
+## Status
+- **Branch**: feat/user-preferences
+- **Commits this session**: 1
+  - a3f5c21 feat(api): add user preferences endpoint (WIP)
+- **Uncommitted changes**: 3 files modified
+- **Tests**: ⚠️ 12 passed, 3 failing
+
+## What's Done
+✓ Created API endpoint: PATCH /api/users/:id/preferences
+✓ Added database schema for user_preferences table
+✓ Ran migration successfully
+
+## What's In Progress
+
+⚠️ **Incomplete work** — do not merge yet
+
+- src/api/users/preferences.ts:45 — Validation logic incomplete
+  → Email validation works
+  → Theme validation added
+  → TODO: Add notification preferences validation
+  → TODO: Add timezone validation
+
+- tests/api/preferences.test.ts — 3 tests failing
+  → Test: "should reject invalid timezone" — timezone validation not implemented
+  → Test: "should update notification settings" — field not in schema
+  → Test: "should prevent XSS in bio field" — sanitization not added
+
+## What's Pending
+
+- Fix 3 failing tests (validation and sanitization)
+- Add rate limiting to preferences endpoint
+- Update API documentation
+- Test with real data
+
+## Key Decisions Made
+
+1. **Store preferences as JSONB**
+   Why: Flexible schema, can add new preferences without migrations.
+   Trade-off: Less type safety, need runtime validation.
+
+2. **Separate endpoint from user update**
+   Why: Preferences change frequently, user profile rarely.
+   Allows different rate limits and caching strategies.
+
+## Learnings Captured
+
+None this session (incomplete work).
+
+## Files Touched
+
+- `src/api/users/preferences.ts` — Created endpoint (incomplete validation)
+- `src/types/preferences.ts` — Added types for preferences
+- `tests/api/preferences.test.ts` — Added tests (3 failing)
+- `migrations/007_user_preferences.sql` — Created and ran migration
+
+## Gotchas for Next Session
+
+⚠️ **Do not merge or deploy** — validation incomplete, tests failing
+
+- Timezone validation needs third-party library (recommend: `@vvo/tzdb`)
+- Notification preferences field not in database schema (need migration)
+- Bio field needs XSS sanitization (recommend: `xss` package)
+- Rate limiting not implemented (users could spam preferences updates)
+
+## Resume Command
+
+> Continue on feat/user-preferences branch. API endpoint created but validation incomplete.
+> Next step: Fix 3 failing tests by completing validation logic in src/api/users/preferences.ts:45.
+> Start with timezone validation using @vvo/tzdb library.
+
+⚠️ Work in incomplete state. Prioritize finishing before starting new tasks.
+
+Handoff saved to .claude/handoff-2026-03-08-3.md
+```
+
+## Guardrails
+
+<CardGroup cols={2}>
+  <Card title="Write for the Reader" icon="user">
+    Write for the next session (which might be you tomorrow), not the writer. Be explicit, not implicit.
+  </Card>
+  <Card title="Include Specific Locations" icon="location-dot">
+    Use file paths and line numbers. "Fix validation" is vague. "Complete validation in src/api/users.ts:45" is clear.
+  </Card>
+  <Card title="Copy-Pasteable Resume" icon="copy">
+    The resume command should work as-is. Test: could you paste it and start immediately?
+  </Card>
+  <Card title="Factual, Not Interpretive" icon="scale-balanced">
+    Describe changes functionally. Don't infer motivation unless explicitly discussed.
+  </Card>
+</CardGroup>
+
+## Integration with Pro Workflow
+
+<CardGroup cols={2}>
+  <Card title="Wrap-Up" icon="check-circle" href="/skills/wrap-up">
+    Run wrap-up before handoff to ensure clean state
+  </Card>
+  <Card title="Replay Learnings" icon="rotate-right" href="/skills/replay-learnings">
+    Resume command can trigger replay to load context
+  </Card>
+  <Card title="Smart Commit" icon="code-commit" href="/skills/smart-commit">
+    Commit before handoff if work is complete
+  </Card>
+  <Card title="Learn Rule" icon="graduation-cap" href="/skills/learn-rule">
+    Learnings from session included in handoff
+  </Card>
+</CardGroup>
+
+## Configuration
+
+### Auto-Handoff on Session End
+
+Add to CLAUDE.md:
+
+```markdown
+## Session End
+
+Before closing:
+1. Run /wrap-up to check state
+2. Generate /handoff document
+3. Save to .claude/handoffs/[date].md
+```
+
+### Custom Handoff Template
+
+Create custom template in `.claude/templates/handoff.md`:
+
+```markdown
+# Session Handoff — $DATE
+
+## Branch: $BRANCH
+
+## [Your custom sections here]
+
+## Resume
+> $RESUME_COMMAND
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Generate Before Context Switch" icon="right-left">
+    Create handoff before switching to another project. Context is freshest now.
+  </Accordion>
+  
+  <Accordion title="Include Blockers Explicitly" icon="road-barrier">
+    If waiting on PR review, external API, or team decision, say so clearly.
+  </Accordion>
+  
+  <Accordion title="Flag Incomplete Work" icon="triangle-exclamation">
+    Mark work-in-progress prominently. Future you needs to know not to merge.
+  </Accordion>
+  
+  <Accordion title="Test Resume Command" icon="vial">
+    Pretend you're starting fresh. Is the resume command enough context?
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### Handoff Too Long
+
+Keep it concise:
+- What's Done: 3-5 bullet points max
+- Key Decisions: Top 2-3 only
+- Files Touched: Summarize if >10 files
+
+### Resume Command Unclear
+
+Good resume command:
+```text
+> Continue on feat/oauth branch. Google OAuth implemented, GitHub pending.
+> Next step: Implement GitHub provider in src/auth/providers/github.ts.
+```
+
+Bad resume command:
+```text
+> Keep working on auth stuff.
+```
+
+### Incomplete Work Forgotten
+
+Add incomplete work to:
+1. Handoff document ("What's In Progress")
+2. Git commit message if committed
+3. TODO comments in code
+4. Project TODO file
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Master Wrap-Up" icon="check-circle" href="/skills/wrap-up">
+    Run wrap-up before handoff for clean state
+  </Card>
+  <Card title="Try Replay" icon="rotate-right" href="/skills/replay-learnings">
+    Resume with replay to load relevant context
+  </Card>
+  <Card title="View Insights" icon="chart-line" href="/skills/insights">
+    Track session patterns and productivity
+  </Card>
+  <Card title="Explore Pro Workflow" icon="star" href="/skills/pro-workflow">
+    See the complete workflow system
+  </Card>
+</CardGroup>

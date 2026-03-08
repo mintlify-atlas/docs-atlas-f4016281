@@ -1,0 +1,472 @@
+---
+title: 'Learn Rule'
+description: 'Capture corrections as persistent learning rules with category, mistake, and correction context'
+icon: 'graduation-cap'
+---
+
+## Overview
+
+Learn Rule captures mistakes and corrections as persistent learning rules that prevent future errors. It's the foundation of the self-correction loop — the most powerful pattern in Pro Workflow.
+
+<Note>
+After 50 sessions with learn-rule, Claude barely needs correcting. Small corrections compound into big gains.
+</Note>
+
+## Trigger
+
+Use when:
+- The user says "remember this", "add to rules", "don't do that again"
+- After a mistake is identified
+- During wrap-up when capturing session learnings
+- The user corrects Claude's behavior or output
+
+<CodeGroup>
+```bash Claude Code
+/learn-rule
+/pro-workflow:learn-rule
+```
+
+```bash Cursor
+# Skill is available automatically
+"remember this pattern"
+"add that to your rules"
+```
+</CodeGroup>
+
+## Workflow
+
+<Steps>
+  <Step title="Identify the Lesson">
+    What mistake was made? What should happen instead?
+    
+    Example:
+    - Mistake: Edited `src/utils.ts` when user meant `src/lib/utils.ts`
+    - Correction: Always confirm full path before editing
+  </Step>
+  
+  <Step title="Format the Rule">
+    Use the structured format with category, mistake, and correction
+    
+    ```text
+    [LEARN] Category: One-line rule
+    Mistake: What went wrong
+    Correction: How it was fixed
+    ```
+  </Step>
+  
+  <Step title="Propose Addition">
+    Present the rule to the user and wait for approval
+    
+    ```text
+    [LEARN] Navigation: Confirm full path when multiple files share a name.
+    
+    Add to LEARNED section? (y/n)
+    ```
+  </Step>
+  
+  <Step title="Persist to Memory">
+    After approval, add to LEARNED section or project memory
+    
+    Location:
+    - `.claude/LEARNED.md` (split memory)
+    - `CLAUDE.md` under `### LEARNED` section (monolithic)
+    - SQLite database (Pro Workflow plugin)
+  </Step>
+</Steps>
+
+<Warning>
+**Always wait for user approval** before persisting. Never auto-add rules without confirmation.
+</Warning>
+
+## Format
+
+### Standard Format
+
+```text
+[LEARN] Category: One-line rule
+Mistake: What went wrong
+Correction: How it was fixed
+```
+
+### Minimal Format (For CLAUDE.md)
+
+```text
+[LEARN] Category: One-line rule
+```
+
+Use minimal format when storing in CLAUDE.md to save context tokens. Use full format in dedicated LEARNED.md files.
+
+## Categories
+
+Learn Rule organizes corrections into 8 categories:
+
+<AccordionGroup>
+  <Accordion title="Navigation" icon="compass">
+    File paths, finding code, wrong file edited
+    
+    **Examples:**
+    - `[LEARN] Navigation: Confirm full path when multiple files share a name`
+    - `[LEARN] Navigation: Auth middleware is in src/middleware/ not src/auth/`
+    - `[LEARN] Navigation: Use Glob to find files before assuming location`
+  </Accordion>
+  
+  <Accordion title="Editing" icon="pen-to-square">
+    Code changes, patterns, wrong approach
+    
+    **Examples:**
+    - `[LEARN] Editing: Use early returns instead of nested if statements`
+    - `[LEARN] Editing: Always use async/await, not .then() chains`
+    - `[LEARN] Editing: Read file before editing to preserve formatting`
+  </Accordion>
+  
+  <Accordion title="Testing" icon="vial">
+    Test approaches, coverage gaps, flaky tests
+    
+    **Examples:**
+    - `[LEARN] Testing: Mock external APIs in auth tests to prevent flakiness`
+    - `[LEARN] Testing: Run tests before commit, not after`
+    - `[LEARN] Testing: Use --changed flag to test only affected files`
+  </Accordion>
+  
+  <Accordion title="Git" icon="code-branch">
+    Commits, branches, merge issues
+    
+    **Examples:**
+    - `[LEARN] Git: Always pull before creating new feature branches`
+    - `[LEARN] Git: Use conventional commit format for consistency`
+    - `[LEARN] Git: Stage specific files by name, never git add .`
+  </Accordion>
+  
+  <Accordion title="Quality" icon="shield-check">
+    Lint, types, style violations
+    
+    **Examples:**
+    - `[LEARN] Quality: Run typecheck after adding new interfaces`
+    - `[LEARN] Quality: Fix lint warnings immediately, don't accumulate`
+    - `[LEARN] Quality: Remove console.log before committing`
+  </Accordion>
+  
+  <Accordion title="Context" icon="messages">
+    When to clarify, missing requirements
+    
+    **Examples:**
+    - `[LEARN] Context: Ask about error handling strategy before implementing`
+    - `[LEARN] Context: Clarify scope before touching >5 files`
+    - `[LEARN] Context: Request examples when requirements are vague`
+  </Accordion>
+  
+  <Accordion title="Architecture" icon="building">
+    Design decisions, wrong abstractions
+    
+    **Examples:**
+    - `[LEARN] Architecture: Keep business logic out of React components`
+    - `[LEARN] Architecture: Prefer composition over inheritance`
+    - `[LEARN] Architecture: Don't create abstractions for one-time use`
+  </Accordion>
+  
+  <Accordion title="Performance" icon="gauge-high">
+    Optimization, O(n^2) loops, memory
+    
+    **Examples:**
+    - `[LEARN] Performance: Use indexes for frequently queried fields`
+    - `[LEARN] Performance: Debounce search input, don't query on every keystroke`
+    - `[LEARN] Performance: Cache expensive computations in useMemo`
+  </Accordion>
+</AccordionGroup>
+
+## Example Flows
+
+### Example 1: Wrong File Edited
+
+```text
+User: You edited the wrong file
+
+Claude: I edited src/utils.ts when you meant src/lib/utils.ts.
+Let me fix that.
+
+[Fixes the mistake]
+
+To prevent this in the future:
+
+[LEARN] Navigation: Confirm full path before editing files with common names.
+Mistake: Edited src/utils.ts assuming it was the right file
+Correction: Asked for clarification: "There are 2 files named utils.ts. Which one?"
+
+Should I add this to LEARNED? (y/n)
+
+User: y
+
+Claude: ✓ Added to LEARNED section. I'll confirm file paths before editing in future sessions.
+```
+
+### Example 2: Quality Gate Violation
+
+```text
+User: You left console.log in the code
+
+Claude: You're right, I left console.log('user:', user) in src/api/auth.ts:42.
+Let me remove it.
+
+[Removes console.log]
+
+To prevent this:
+
+[LEARN] Quality: Remove console.log statements before committing code.
+Mistake: Left debug console.log in production code
+Correction: Removed before commit, will scan for console.log in future edits
+
+Add to LEARNED? (y/n)
+
+User: yes
+
+Claude: ✓ Learned. I'll scan for debug statements before wrapping up sessions.
+```
+
+### Example 3: Architecture Decision
+
+```text
+User: Don't put business logic in React components
+
+Claude: You're right. I added the user validation logic directly in UserProfile.tsx
+when it should be in a separate service.
+
+Let me extract it to src/services/userValidation.ts.
+
+[Refactors code]
+
+[LEARN] Architecture: Keep business logic in services, not React components.
+Mistake: Added validation logic directly in UserProfile component
+Correction: Extracted to src/services/userValidation.ts, component just calls service
+
+Add this pattern? (y/n)
+
+User: y
+
+Claude: ✓ Learned. Business logic stays in services, components handle UI only.
+```
+
+### Example 4: Test Approach
+
+```text
+User: These tests are flaky because you're calling the real API
+
+Claude: You're correct. The auth tests in tests/api/auth.test.ts are calling
+the live authentication endpoint, causing intermittent failures.
+
+Let me add mocks:
+
+[Adds API mocks]
+
+[LEARN] Testing: Mock external APIs in tests to prevent flakiness.
+Mistake: Called real OAuth API in tests, causing random failures
+Correction: Added jest.mock() for auth provider, tests now deterministic
+
+Capture this lesson? (y/n)
+
+User: yes
+
+Claude: ✓ Captured. I'll mock external dependencies in future tests.
+```
+
+## Guardrails
+
+<CardGroup cols={2}>
+  <Card title="Always Get Approval" icon="hand">
+    Wait for user confirmation before persisting. Never auto-add rules.
+  </Card>
+  <Card title="Keep Rules Brief" icon="compress">
+    One line, specific and actionable. Bad: "Write good code". Good: "Use snake_case for database columns".
+  </Card>
+  <Card title="Include Context" icon="circle-info">
+    Add mistake and correction details so the rule makes sense later.
+  </Card>
+  <Card title="Specific Over Generic" icon="bullseye">
+    "Confirm path when editing utils.ts" > "Be careful editing files"
+  </Card>
+</CardGroup>
+
+## Storage Locations
+
+### Split Memory (Recommended)
+
+```text
+.claude/
+├── CLAUDE.md          # Core instructions
+└── LEARNED.md         # All learning rules
+```
+
+**Advantages:**
+- Keeps CLAUDE.md concise (&lt;60 lines)
+- Learnings don't clutter core instructions
+- Easy to review all learnings at once
+
+### Monolithic Memory
+
+```markdown
+# CLAUDE.md
+
+## Instructions
+[Core instructions]
+
+## LEARNED
+[LEARN] Navigation: Confirm full path before editing files with common names.
+[LEARN] Testing: Mock external APIs in auth tests to prevent flakiness.
+[LEARN] Quality: Remove console.log statements before committing code.
+```
+
+**Advantages:**
+- Single file to manage
+- Simpler for small projects
+
+### SQLite Database (Pro Workflow Plugin)
+
+```text
+~/.pro-workflow/
+└── data.db    # SQLite with FTS5 full-text search
+```
+
+**Advantages:**
+- Searchable with `/search testing`
+- Analytics with `/insights`
+- Cross-project learnings
+- Track application frequency
+
+## Integration with Pro Workflow
+
+<CardGroup cols={2}>
+  <Card title="Wrap-Up" icon="check-circle" href="/skills/wrap-up">
+    Wrap-up prompts for learnings and calls learn-rule
+  </Card>
+  <Card title="Replay Learnings" icon="rotate-right" href="/skills/replay-learnings">
+    Surface relevant rules before starting tasks
+  </Card>
+  <Card title="Insights" icon="chart-line" href="/skills/insights">
+    Analytics on most/least applied learnings
+  </Card>
+  <Card title="Session Handoff" icon="hand-holding-hand" href="/skills/session-handoff">
+    Learnings captured this session included in handoff
+  </Card>
+</CardGroup>
+
+## Configuration
+
+### Add Self-Correction to CLAUDE.md
+
+```markdown
+## Self-Correction Protocol
+
+When the user corrects me or I make a mistake:
+1. Acknowledge specifically what went wrong
+2. Propose a concise rule: `[LEARN] Category: One-line rule`
+3. Wait for approval before adding to LEARNED section
+
+### LEARNED
+<!-- Auto-populated through corrections -->
+```
+
+### Configure Storage Location
+
+```json
+// settings.local.json (Claude Code)
+{
+  "learnings": {
+    "storage": "file",  // or "database"
+    "file": ".claude/LEARNED.md"
+  }
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Capture Immediately" icon="bolt">
+    Don't wait until wrap-up. Capture corrections as they happen while context is fresh.
+  </Accordion>
+  
+  <Accordion title="Be Specific" icon="crosshairs">
+    Good: "Mock auth API in tests using jest.mock('@/lib/auth')"
+    Bad: "Write better tests"
+  </Accordion>
+  
+  <Accordion title="Include Why" icon="circle-question">
+    Add the mistake and correction context. Future sessions need to understand the reasoning.
+  </Accordion>
+  
+  <Accordion title="Review Regularly" icon="clock-rotate-left">
+    Use `/insights` to see which learnings are applied vs. stale. Remove outdated rules.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### Learnings Not Being Applied
+
+Check:
+1. Is the learning in the loaded CLAUDE.md or LEARNED.md?
+2. Is it specific enough to be actionable?
+3. Run `/replay` to explicitly surface relevant learnings
+
+### Too Many Learnings
+
+If LEARNED section grows too large:
+1. Move to split memory (LEARNED.md)
+2. Archive old/stale learnings
+3. Use SQLite database for searchability
+
+### Same Mistake Repeated
+
+If Claude repeats a learned mistake:
+1. Make the rule more specific
+2. Add more context (mistake + correction)
+3. Place the rule higher in LEARNED section
+4. Explicitly mention it: "Remember your rule about X?"
+
+## Advanced: Searchable Learnings
+
+With Pro Workflow plugin (SQLite storage):
+
+```bash
+# Search by keyword
+/search testing
+/search "file paths"
+
+# List all learnings
+/list
+
+# List by category
+/list --category Navigation
+
+# Show application frequency
+/insights
+```
+
+Output:
+```text
+Learnings matching 'testing' (3 results):
+
+1. [Testing] Mock external APIs in auth tests to prevent flakiness
+   Applied: 8 times | Last: 2026-03-05
+   
+2. [Testing] Run tests before commit, not after
+   Applied: 15 times | Last: 2026-03-08
+   
+3. [Testing] Use --changed flag to test only affected files
+   Applied: 3 times | Last: 2026-03-01
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Try Replay Learnings" icon="rotate-right" href="/skills/replay-learnings">
+    Surface relevant lessons before starting tasks
+  </Card>
+  <Card title="View Insights" icon="chart-line" href="/skills/insights">
+    Analytics on learning patterns and correction trends
+  </Card>
+  <Card title="Master Wrap-Up" icon="check-circle" href="/skills/wrap-up">
+    Capture learnings at the end of every session
+  </Card>
+  <Card title="Explore Pro Workflow" icon="star" href="/skills/pro-workflow">
+    See the complete workflow system
+  </Card>
+</CardGroup>

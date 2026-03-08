@@ -1,0 +1,513 @@
+---
+title: Skill Frontmatter
+description: Define reusable skills with YAML frontmatter and markdown
+---
+
+Skills in Pro Workflow are reusable, self-contained procedures defined in markdown with YAML frontmatter. They can be invoked by users, agents, or preloaded into agent context.
+
+## Skill Structure
+
+```markdown
+---
+name: skill-name
+description: What this skill does
+argument-hint: <parameter>
+disable-model-invocation: false
+user-invocable: true
+allowed-tools: ["Read", "Bash"]
+model: opus
+context: fork
+agent: planner
+hooks: {...}
+---
+
+# Skill Name
+
+Detailed instructions for execution.
+
+## Workflow
+
+1. Step one
+2. Step two
+
+## Output
+
+Expected output format.
+```
+
+## Frontmatter Fields
+
+### Core Configuration
+
+<ParamField path="name" type="string" required>
+  Skill identifier. Used for invocation (`/skill-name`) and agent preloading.
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  Short description of when to invoke this skill. Used for skill discovery.
+</ParamField>
+
+<ParamField path="argument-hint" type="string">
+  Placeholder text for skill parameters. Example: `<query>`, `<file> <action>`.
+</ParamField>
+
+<CodeGroup>
+
+```yaml Basic Skill
+---
+name: wrap-up
+description: End-of-session ritual
+---
+
+# Wrap-Up
+
+Run checklist at session end.
+```
+
+```yaml Skill with Arguments
+---
+name: search
+description: Search learnings database
+argument-hint: <query>
+---
+
+# Search
+
+Query: $ARGUMENTS
+```
+
+</CodeGroup>
+
+### Invocation Control
+
+<ParamField path="user-invocable" type="boolean" default="true">
+  Whether users can invoke this skill directly via `/skill-name`.
+</ParamField>
+
+<ParamField path="disable-model-invocation" type="boolean" default="false">
+  Prevent Claude from auto-invoking this skill. User-only invocation.
+</ParamField>
+
+<CodeGroup>
+
+```yaml User-Invocable
+---
+name: wrap-up
+user-invocable: true
+---
+
+Users can run /wrap-up
+```
+
+```yaml Background-Only
+---
+name: internal-helper
+user-invocable: false
+---
+
+Only accessible to agents, not users.
+```
+
+```yaml Manual-Only
+---
+name: dangerous-operation
+user-invocable: true
+disable-model-invocation: true
+---
+
+Users can invoke, but Claude cannot auto-invoke.
+```
+
+</CodeGroup>
+
+### Tool Constraints
+
+<ParamField path="allowed-tools" type="string[]">
+  Whitelist of tools available during skill execution.
+</ParamField>
+
+```yaml
+---
+name: safe-search
+allowed-tools: ["Read", "Grep"]
+---
+
+Read-only search skill.
+```
+
+### Model Selection
+
+<ParamField path="model" type="string">
+  Model override for skill execution. Values: `opus`, `sonnet`, `haiku`.
+</ParamField>
+
+```yaml
+---
+name: deep-analysis
+model: opus
+---
+
+Use Opus for complex analysis.
+```
+
+### Execution Context
+
+<ParamField path="context" type="string">
+  Execution isolation. Values:
+  - `fork`: Run in isolated subagent context (doesn't pollute main session)
+</ParamField>
+
+```yaml
+---
+name: heavy-exploration
+context: fork
+---
+
+Run in isolated context to avoid polluting main session.
+```
+
+<Info>
+  Skills with `context: fork` create a subagent that runs independently. Main session context remains clean.
+</Info>
+
+### Agent Delegation
+
+<ParamField path="agent" type="string">
+  Delegate skill execution to a specific agent.
+</ParamField>
+
+```yaml
+---
+name: review-code
+agent: reviewer
+---
+
+Delegate to reviewer agent when invoked.
+```
+
+### Hooks
+
+<ParamField path="hooks" type="object">
+  Skill-specific hooks for lifecycle events.
+</ParamField>
+
+```yaml
+---
+name: quality-gate
+hooks:
+  PreToolUse:
+    - command: "echo 'Starting quality gate'"
+  PostToolUse:
+    - command: "npm run report-coverage"
+---
+
+Skill with custom hooks.
+```
+
+## Skill Types
+
+### User-Invoked Skills
+
+```yaml
+---
+name: wrap-up
+description: End-of-session ritual
+user-invocable: true
+---
+
+# Wrap-Up
+
+Run these checks:
+1. git status
+2. Run tests
+3. Capture learnings
+```
+
+**Usage:** `/wrap-up`
+
+### Agent-Preloaded Skills
+
+```yaml
+---
+name: api-conventions
+description: REST API design patterns
+user-invocable: false
+---
+
+# API Conventions
+
+- Use camelCase for JSON
+- Use snake_case for database
+- Bearer token auth
+```
+
+**Usage:** Loaded into agent context at startup via `skills: ["api-conventions"]`
+
+### On-Demand Skills
+
+```yaml
+---
+name: replay-learnings
+description: Surface relevant past learnings
+user-invocable: true
+context: fork
+---
+
+# Replay Learnings
+
+Search database for relevant learnings without polluting main context.
+```
+
+**Usage:** `/replay-learnings` or Claude invokes when needed
+
+### Delegated Skills
+
+```yaml
+---
+name: develop
+description: Multi-phase feature development
+agent: orchestrator
+---
+
+# Develop
+
+Delegate to orchestrator agent for Research > Plan > Implement workflow.
+```
+
+**Usage:** `/develop <feature>` delegates to orchestrator agent
+
+## Complete Examples
+
+<Accordion title="Wrap-Up Skill">
+
+```markdown
+---
+name: wrap-up
+description: End-of-session ritual that audits changes, runs quality checks, captures learnings, and produces a session summary. Use when saying "wrap up", "done for the day", "finish coding", or ending a coding session.
+user-invocable: true
+allowed-tools: ["Read", "Bash"]
+---
+
+# Wrap-Up Ritual
+
+End your coding session with intention.
+
+## Workflow
+
+1. **Changes Audit** — What files were modified? Anything uncommitted? TODOs left in code?
+2. **Quality Check** — Run lint, typecheck, and tests. All passing? Any warnings?
+3. **Learning Capture** — What mistakes were made? What patterns worked well? Format as `[LEARN] Category: Rule`
+4. **Next Session Context** — What's the next logical task? Any blockers? Context to preserve?
+5. **Summary** — One paragraph: what was accomplished, current state, what's next.
+
+## Commands
+
+\`\`\`bash
+git status
+git diff --stat
+
+npm run lint 2>&1 | head -20
+npm run typecheck 2>&1 | head -20
+npm test -- --changed --passWithNoTests
+\`\`\`
+
+## Output
+
+- Modified file list with uncommitted changes highlighted
+- Quality gate results
+- Captured learnings (if any)
+- One-paragraph session summary
+- Next session resume context
+
+After completing checklist, ask: "Ready to end session?"
+```
+
+</Accordion>
+
+<Accordion title="Orchestrate Skill">
+
+```markdown
+---
+name: orchestrate
+description: Wire Commands, Agents, and Skills together for complex features. Use when building features that need research, planning, and implementation phases.
+user-invocable: true
+agent: orchestrator
+---
+
+# Orchestrate - Multi-Phase Feature Development
+
+Delegate to orchestrator agent for structured feature development.
+
+## The Pattern
+
+\`\`\`text
+/develop <feature>
+  │
+  ├── Phase 1: Research (orchestrator agent)
+  │   └── Score confidence → GO/HOLD
+  │
+  ├── Phase 2: Plan (orchestrator agent)
+  │   └── Present plan → wait for approval
+  │
+  ├── Phase 3: Implement (orchestrator agent)
+  │   └── Execute plan → quality gates
+  │
+  └── Phase 4: Review (reviewer agent)
+      └── Code review → commit
+\`\`\`
+
+## Usage
+
+When asked to build a feature:
+
+1. **Start with research**: Delegate to orchestrator agent
+2. **Wait for GO/HOLD**: Don't proceed if confidence < 70
+3. **Present a plan**: List all files, approach, risks
+4. **Get approval**: Never implement without explicit "proceed"
+5. **Implement step by step**: Quality gates every 5 edits
+6. **Review before commit**: Run reviewer agent
+```
+
+</Accordion>
+
+<Accordion title="Replay Learnings Skill">
+
+```markdown
+---
+name: replay-learnings
+description: Surface relevant past learnings for the current task
+user-invocable: true
+context: fork
+allowed-tools: ["Bash"]
+---
+
+# Replay Learnings
+
+Surface relevant learnings without polluting main context.
+
+## Workflow
+
+1. Ask user what they're working on
+2. Search learnings database for relevant patterns
+3. Present top 5 matches
+4. Ask if user wants to apply any
+
+## Search
+
+\`\`\`bash
+node -e "
+const { createStore, searchLearnings } = require('pro-workflow');
+const store = createStore();
+const results = searchLearnings(store.db, process.argv[1], { limit: 5 });
+
+if (results.length > 0) {
+  console.log('Relevant learnings:');
+  for (const r of results) {
+    console.log('\\n#' + r.id + ' [' + r.category + '] ' + r.rule);
+    if (r.mistake) console.log('  Mistake: ' + r.mistake);
+    if (r.correction) console.log('  Correction: ' + r.correction);
+    console.log('  Applied: ' + r.times_applied + 'x');
+  }
+}
+
+store.close();
+" "<query>"
+\`\`\`
+```
+
+</Accordion>
+
+## Skill Discovery
+
+Skills are discovered from:
+
+1. **Project:** `.claude/skills/*/SKILL.md`
+2. **User:** `~/.claude/skills/*/SKILL.md`
+3. **Plugin:** `~/.claude/plugins/*/skills/*/SKILL.md`
+
+<Note>
+  Skill names come from the directory name: `skills/wrap-up/SKILL.md` → skill name is `wrap-up`.
+</Note>
+
+## Precedence
+
+When multiple skills have the same name:
+
+1. Project (`.claude/skills/`) — highest priority
+2. User (`~/.claude/skills/`)
+3. Plugin (`~/.claude/plugins/*/skills/`) — lowest priority
+
+## Dynamic Substitution
+
+Skills support the same substitution as commands:
+
+<CodeGroup>
+
+```markdown Arguments
+$ARGUMENTS      # All arguments
+$ARGUMENTS[0]   # First argument
+$ARGUMENTS[1:]  # All except first
+```
+
+```markdown Environment
+${CLAUDE_SESSION_ID}
+${PROJECT_NAME}
+${PRO_WORKFLOW_DB_PATH}
+```
+
+```markdown Live Commands
+!`git branch --show-current`
+!`git diff --name-only`
+```
+
+</CodeGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Single Purpose" icon="bullseye">
+    One skill, one job. Don't create multi-purpose swiss-army-knife skills.
+  </Card>
+  <Card title="Clear Triggers" icon="lightbulb">
+    Document when to use the skill in the description field.
+  </Card>
+  <Card title="Use Context Fork" icon="code-fork">
+    Heavy skills should use `context: fork` to avoid polluting main session.
+  </Card>
+  <Card title="Delegate When Possible" icon="share-nodes">
+    Complex skills should delegate to agents rather than doing everything inline.
+  </Card>
+</CardGroup>
+
+## Testing Skills
+
+```bash
+# Validate skill exists
+ls .claude/skills/my-skill/SKILL.md
+
+# Check frontmatter
+head -10 .claude/skills/my-skill/SKILL.md
+
+# Invoke skill
+/my-skill test argument
+
+# Verify skill is discovered
+grep -r "name: my-skill" .claude/skills/
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Skill Discovery" icon="magnifying-glass" href="/api/skills/discovery">
+    How skills are found and loaded
+  </Card>
+  <Card title="Skill Preloading" icon="bolt" href="/api/skills/preloading">
+    Load skills into agent context
+  </Card>
+  <Card title="Agent Skills" icon="robot" href="/api/agents/skills">
+    Configure agent skill preloading
+  </Card>
+  <Card title="Commands" icon="terminal" href="/api/commands/frontmatter">
+    Create commands that invoke skills
+  </Card>
+</CardGroup>

@@ -1,0 +1,396 @@
+---
+title: 'Session Insights'
+description: 'Track session analytics, learning patterns, correction trends, and productivity metrics'
+icon: 'chart-line'
+---
+
+## Overview
+
+Session Insights surfaces patterns from your coding sessions: learning analytics, correction trends, productivity metrics, and heatmaps showing where you make the most mistakes.
+
+<Note>
+**Measure what matters.** Track correction rates, learning application, and productivity trends over time.
+</Note>
+
+## Trigger
+
+Use when:
+- Asking "show stats", "how am I doing", "analytics", "dashboard"
+- Wanting to see "correction rate" or "session history"
+- Reviewing learnings to see what's working vs stale
+- Monthly review or retrospective
+
+<CodeGroup>
+```bash Claude Code
+/insights
+/pro-workflow:insights
+```
+
+```bash Cursor
+# Skill is available automatically
+"show me my coding stats"
+"what are my correction trends?"
+```
+</CodeGroup>
+
+## Data Sources
+
+Insights gathers data from:
+
+```bash
+# Session history and learnings
+cat .claude/LEARNED.md 2>/dev/null || cat CLAUDE.md | grep -A999 "LEARNED"
+cat .claude/learning-log.md 2>/dev/null
+
+# Session activity
+git log --oneline --since="today" --author="$(git config user.name)"
+git diff --stat
+```
+
+A **correction** is any instance where the user redirected, fixed, or overrode agent output during a session. Count `[LEARN]` entries and explicit correction markers in session history.
+
+## What It Shows
+
+### 1. Session Summary
+
+Current session stats:
+
+```text
+Session Insights
+  Duration: 47 min
+  Edits: 23 files modified
+  Corrections: 2 self-corrections applied
+  Learnings: 3 new patterns captured
+  Context: 62% used (safe)
+```
+
+### 2. Learning Analytics
+
+Breakdown of all learnings:
+
+```text
+Learning Insights (42 total)
+
+Top categories:
+  Testing     12 learnings (29%)
+  Navigation   8 learnings (19%)
+  Git          7 learnings (17%)
+  Quality      6 learnings (14%)
+
+Most applied:
+  #12 [Testing] Run tests before commit — 15 times
+  #8  [Navigation] Confirm path for common names — 11 times
+  #3  [Git] Always pull before creating branches — 9 times
+
+Stale learnings (never applied):
+  #15 [Editing] Prefer named exports — 0 times (45 days old)
+  #22 [Quality] Use strict TypeScript config — 0 times (30 days old)
+  
+  → Consider: Review if these patterns are still relevant
+```
+
+### 3. Correction Heatmap
+
+Where mistakes happen most:
+
+```text
+Correction Heatmap
+
+By category (all time):
+  ████████████ Testing      34 corrections
+  ████████     Navigation   22 corrections
+  ██████       Git          18 corrections
+  ████         Quality      12 corrections
+  ██           Architecture  6 corrections
+  █            Performance   3 corrections
+
+Hot learnings (most corrected, least learned):
+  - [Testing] Mock external deps — corrected 8x, learned 0x
+    → Consider: /learn-rule to capture this permanently
+    
+  - [Navigation] Check src/lib/ before src/utils/ — corrected 5x, learned 0x
+    → Consider: Add to LEARNED section
+
+Cold learnings (learned but never applied):
+  - [Editing] Use named exports — learned 45 days ago, applied 0x
+    → Consider: Remove if no longer relevant
+    
+  - [Architecture] Avoid default exports — learned 30 days ago, applied 0x
+    → Consider: Review if pattern changed
+```
+
+### 4. Productivity Metrics
+
+Trends over time:
+
+```text
+Productivity (last 10 sessions)
+  Avg session: 35 min
+  Avg edits/session: 18 files
+  Correction rate: 12% (improving ↓)
+  Learning capture: 2.1 per session
+  
+Trend:
+  Week 1: 18% correction rate
+  Week 2: 15% correction rate
+  Week 3: 12% correction rate
+  
+  ✓ Correction rate decreasing — learnings are working!
+  
+Top productivity days:
+  - 2026-03-05: 8 edits, 0 corrections (0% rate) ✓
+  - 2026-03-01: 12 edits, 1 correction (8.3% rate) ✓
+  - 2026-02-28: 15 edits, 1 correction (6.7% rate) ✓
+```
+
+## Output Example
+
+Complete insights report:
+
+```text
+=====================================
+SESSION INSIGHTS
+=====================================
+
+CURRENT SESSION
+  Duration: 47 min
+  Files edited: 23
+  Corrections: 2 (8.7% rate)
+  Learnings captured: 3
+  Context usage: 62%
+
+LEARNING ANALYTICS (42 total learnings)
+
+Top categories:
+  █████████ Testing     12 (29%)
+  ██████       Navigation   8 (19%)
+  █████         Git          7 (17%)
+  ████          Quality      6 (14%)
+
+Most applied learnings:
+  1. [Testing] Run tests before commit — 15x
+  2. [Navigation] Confirm path for common names — 11x
+  3. [Git] Always pull before creating branches — 9x
+  4. [Testing] Mock external APIs — 8x
+  5. [Quality] Remove console.log before commit — 7x
+
+Stale learnings (never applied):
+  - [Editing] Prefer named exports (45 days old)
+  - [Quality] Use strict TypeScript config (30 days old)
+  
+  → Review and update or remove these patterns
+
+CORRECTION HEATMAP
+
+By category (all time):
+  ████████████ Testing      34 corrections
+  ████████     Navigation   22 corrections
+  ██████       Git          18 corrections
+  ████         Quality      12 corrections
+
+Hot learnings (corrected often, not learned):
+  - [Testing] Mock external deps — 8 corrections, 0 learnings
+  - [Navigation] Check src/lib/ first — 5 corrections, 0 learnings
+  
+  → Use /learn-rule to capture these patterns
+
+PRODUCTIVITY TRENDS (last 10 sessions)
+
+Average session: 35 min, 18 edits
+Correction rate: 12% (improving ↓)
+  Week 1: 18%
+  Week 2: 15%
+  Week 3: 12%
+  
+  ✓ Learnings are reducing mistakes!
+
+Best sessions (lowest correction rate):
+  1. 2026-03-05: 8 edits, 0 corrections (0%)
+  2. 2026-03-01: 12 edits, 1 correction (8.3%)
+  3. 2026-02-28: 15 edits, 1 correction (6.7%)
+
+Worst sessions (highest correction rate):
+  1. 2026-02-20: 10 edits, 4 corrections (40%)
+     Topic: React performance optimization
+     → High correction area — add more learnings
+     
+  2. 2026-02-15: 8 edits, 3 corrections (37.5%)
+     Topic: Database migrations
+     → Review patterns before next migration
+
+=====================================
+SUGGESTIONS
+
+1. Capture "Mock external deps" as learning (corrected 8x, never learned)
+2. Review stale learnings: named exports, strict TS (never applied)
+3. React performance is high correction area (40% rate) — add more patterns
+4. ✓ Overall trend improving — keep capturing learnings!
+
+=====================================
+```
+
+## Guardrails
+
+<CardGroup cols={2}>
+  <Card title="Use Actual Data" icon="database">
+    Never make up stats. Use real data from project memory and session history.
+  </Card>
+  <Card title="Surface Actionable Suggestions" icon="lightbulb">
+    Not just numbers. Suggest: capture hot learnings, review stale patterns, focus on high correction areas.
+  </Card>
+  <Card title="Flag Recurring Corrections" icon="rotate">
+    If corrected 5+ times without learning, prompt to capture it.
+  </Card>
+  <Card title="Identify Stale Learnings" icon="calendar-xmark">
+    Learnings >30 days old with 0 applications may no longer be relevant.
+  </Card>
+</CardGroup>
+
+## Integration with Pro Workflow
+
+<CardGroup cols={2}>
+  <Card title="Learn Rule" icon="graduation-cap" href="/skills/learn-rule">
+    Insights shows which corrections need to become learnings
+  </Card>
+  <Card title="Replay Learnings" icon="rotate-right" href="/skills/replay-learnings">
+    Application frequency data comes from insights tracking
+  </Card>
+  <Card title="Wrap-Up" icon="check-circle" href="/skills/wrap-up">
+    Session data feeds into insights analytics
+  </Card>
+  <Card title="Context Optimizer" icon="gauge-high" href="/skills/context-optimizer">
+    Context usage tracking from insights
+  </Card>
+</CardGroup>
+
+## Configuration
+
+### Enable Session Tracking
+
+Add to CLAUDE.md:
+
+```markdown
+## Session Tracking
+
+After each session:
+- Track correction count
+- Log session duration and edits
+- Note topics and correction categories
+- Store in .claude/sessions/[date].json
+```
+
+### SQLite Storage (Pro Workflow Plugin)
+
+With Pro Workflow plugin:
+
+```text
+~/.pro-workflow/data.db
+  ├── learnings (id, category, rule, created, applied_count)
+  ├── sessions (id, date, duration, edits, corrections, topics)
+  └── corrections (id, session_id, category, learning_id)
+```
+
+Enables advanced queries:
+```bash
+/insights --last 30
+/insights --category Testing
+/insights --topic "database migrations"
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Review Monthly" icon="calendar">
+    Run insights monthly to see trends. Are correction rates improving? Are learnings being applied?
+  </Accordion>
+  
+  <Accordion title="Act on Hot Learnings" icon="fire">
+    If corrected 5+ times without a learning, capture it immediately with /learn-rule.
+  </Accordion>
+  
+  <Accordion title="Clean Up Stale Patterns" icon="broom">
+    Learnings >30 days old with 0 applications should be reviewed, updated, or removed.
+  </Accordion>
+  
+  <Accordion title="Focus on High Correction Areas" icon="bullseye">
+    If a topic has >20% correction rate, add more learnings before working in that area again.
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Queries
+
+With SQLite storage:
+
+### Correction Rate by Topic
+
+```sql
+SELECT topic, 
+       COUNT(*) as sessions,
+       AVG(corrections * 100.0 / edits) as avg_correction_rate
+FROM sessions
+GROUP BY topic
+ORDER BY avg_correction_rate DESC;
+```
+
+### Most Valuable Learnings
+
+```sql
+SELECT l.category, l.rule, l.applied_count,
+       (SELECT COUNT(*) FROM corrections c 
+        WHERE c.category = l.category 
+        AND c.created < l.created) as corrections_before
+FROM learnings l
+WHERE l.applied_count > 5
+ORDER BY l.applied_count DESC;
+```
+
+### Productivity Trend
+
+```sql
+SELECT DATE(created) as date,
+       AVG(corrections * 100.0 / edits) as correction_rate
+FROM sessions
+WHERE created > DATE('now', '-30 days')
+GROUP BY date
+ORDER BY date;
+```
+
+## Troubleshooting
+
+### No Session Data
+
+Check:
+1. Is session tracking enabled in settings?
+2. Are sessions being saved to `.claude/sessions/`?
+3. For plugin: is database at `~/.pro-workflow/data.db`?
+
+### Correction Rate Always 0%
+
+Ensure:
+1. Corrections are being tracked (use /learn-rule when correcting)
+2. Session data includes correction count
+3. Database schema includes corrections table
+
+### Stale Learnings Not Detected
+
+Verify:
+1. Learnings have `created` timestamp
+2. Application tracking is enabled
+3. Check if learnings are in loaded memory (CLAUDE.md or LEARNED.md)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Capture More Learnings" icon="graduation-cap" href="/skills/learn-rule">
+    Use insights to identify corrections that need capturing
+  </Card>
+  <Card title="Apply Learnings" icon="rotate-right" href="/skills/replay-learnings">
+    Surface relevant patterns before starting work
+  </Card>
+  <Card title="Optimize Context" icon="gauge-high" href="/skills/context-optimizer">
+    Use context usage data to manage token budget
+  </Card>
+  <Card title="View Pro Workflow" icon="star" href="/skills/pro-workflow">
+    See the complete workflow system
+  </Card>
+</CardGroup>

@@ -1,0 +1,469 @@
+---
+title: Model Preferences
+description: Configure task-specific model routing for optimal performance and cost
+---
+
+## Overview
+
+Model preferences allow you to automatically route different types of tasks to appropriate Claude models. Use faster, cheaper models for simple tasks and reserve powerful models for complex work.
+
+## Configuration
+
+Define model preferences in your project's `config.json`:
+
+```json config.json
+{
+  "model_preferences": {
+    "quick_fixes": "haiku",
+    "features": "sonnet",
+    "refactors": "opus",
+    "architecture": "opus",
+    "debugging": "opus"
+  }
+}
+```
+
+<ParamField path="model_preferences.quick_fixes" type="string" default="haiku">
+  Model for small fixes, typos, imports, formatting
+</ParamField>
+
+<ParamField path="model_preferences.features" type="string" default="sonnet">
+  Model for new feature implementation
+</ParamField>
+
+<ParamField path="model_preferences.refactors" type="string" default="opus">
+  Model for code refactoring and restructuring
+</ParamField>
+
+<ParamField path="model_preferences.architecture" type="string" default="opus">
+  Model for architectural decisions and design
+</ParamField>
+
+<ParamField path="model_preferences.debugging" type="string" default="opus">
+  Model for complex debugging and investigation
+</ParamField>
+
+## Available Models
+
+Claude Code supports multiple Claude models with different capabilities:
+
+| Model | Shorthand | Best For | Speed | Cost |
+|-------|-----------|----------|-------|------|
+| **Claude 3.5 Haiku** | `haiku` | Quick fixes, simple edits, formatting | ⚡⚡⚡ | $ |
+| **Claude 3.5 Sonnet** | `sonnet` | Features, general development | ⚡⚡ | $$ |
+| **Claude 3 Opus** | `opus` | Complex reasoning, architecture | ⚡ | $$$ |
+| **Claude 4.5 Sonnet** | `claude-4.5-sonnet` | Latest capabilities | ⚡⚡ | $$ |
+
+<Note>
+Model preferences are **guidance** for Claude Code's routing logic. The system may override preferences based on context complexity, token usage, or explicit user model selection.
+</Note>
+
+## Task Categories
+
+### Quick Fixes
+
+**Model**: Haiku (fastest, cheapest)
+
+**Use cases**:
+- Fix typos and formatting
+- Add missing imports
+- Adjust whitespace/indentation
+- Simple variable renames
+- Update documentation strings
+
+**Why Haiku**: These tasks require minimal reasoning and benefit from fast turnaround.
+
+### Features
+
+**Model**: Sonnet (balanced)
+
+**Use cases**:
+- Implement new functionality
+- Add API endpoints
+- Create UI components
+- Write business logic
+- Integrate third-party libraries
+
+**Why Sonnet**: Feature development needs good reasoning but not the deepest architectural thinking. Sonnet provides the best balance of capability and speed.
+
+### Refactors
+
+**Model**: Opus (most capable)
+
+**Use cases**:
+- Restructure code organization
+- Extract abstractions
+- Improve design patterns
+- Optimize algorithms
+- Large-scale renames
+
+**Why Opus**: Refactoring requires understanding ripple effects across the codebase. Opus excels at this level of holistic reasoning.
+
+### Architecture
+
+**Model**: Opus (most capable)
+
+**Use cases**:
+- Design system architecture
+- Plan database schemas
+- Choose technology stack
+- Design API contracts
+- Security reviews
+
+**Why Opus**: Architectural decisions have long-term implications and require deep reasoning about tradeoffs, scalability, and maintainability.
+
+### Debugging
+
+**Model**: Opus (most capable)
+
+**Use cases**:
+- Trace complex bugs
+- Analyze race conditions
+- Debug memory issues
+- Investigate performance problems
+- Root cause analysis
+
+**Why Opus**: Debugging often requires following intricate logic paths and understanding subtle interactions. Opus performs best at this deep investigation.
+
+## Agent-Specific Model Overrides
+
+Override model preferences for specific agents:
+
+```yaml agents/researcher.md
+---
+name: researcher
+description: Explore codebase to assess feasibility
+tools: ["Read", "Glob", "Grep"]
+model: opus
+---
+
+You are a research specialist. Thoroughly explore the codebase...
+```
+
+```yaml agents/quick-fixer.md
+---
+name: quick-fixer
+description: Apply simple fixes and formatting
+tools: ["Read", "Edit"]
+model: haiku
+maxTurns: 5
+---
+
+You fix simple issues quickly with minimal context...
+```
+
+<Accordion title="Why agent-specific models?">
+- **Cost optimization**: Use cheap models for constrained agents
+- **Performance**: Fast models for quick tasks
+- **Capability matching**: Complex agents get powerful models
+- **Explicit control**: Override preferences when you know better
+</Accordion>
+
+## Command-Level Overrides
+
+Set model preferences in command definitions:
+
+```markdown commands/deep-refactor.md
+---
+description: Perform deep refactoring with architectural analysis
+argument-hint: <component to refactor>
+model: opus
+---
+
+Perform a comprehensive refactor of: $ARGUMENTS
+
+Consider:
+- Design patterns
+- Performance implications
+- Maintainability
+- Test coverage
+```
+
+```markdown commands/quick-format.md
+---
+description: Fix formatting and style issues
+model: haiku
+---
+
+Quickly format and fix style issues in modified files.
+```
+
+## Skill-Level Overrides
+
+Skills can specify model requirements:
+
+```yaml skills/security-review/SKILL.md
+---
+name: security-review
+description: Deep security analysis and threat modeling
+model: opus
+context: fork
+---
+
+You are a security expert. Analyze code for vulnerabilities...
+```
+
+## Hook-Level Model Control
+
+Hooks support model specification:
+
+```json hooks.json
+{
+  "PostToolUse": [{
+    "matcher": "tool == 'Edit'",
+    "hooks": [{
+      "type": "prompt",
+      "prompt": "Quick check: does this edit introduce obvious bugs?",
+      "model": "haiku",
+      "timeout": 5000
+    }]
+  }],
+  "PreCommit": [{
+    "matcher": "true",
+    "hooks": [{
+      "type": "prompt",
+      "prompt": "Review all changes for security issues, architectural concerns, and potential bugs.",
+      "model": "opus",
+      "timeout": 30000
+    }]
+  }]
+}
+```
+
+## Runtime Model Selection
+
+Users can override model preferences at runtime:
+
+```bash
+# Use specific model for current session
+claude --model opus
+
+# Switch model mid-session
+/model sonnet
+/model haiku
+
+# Check current model
+/model
+```
+
+## Cost Optimization Strategies
+
+### Strategy 1: Conservative Defaults
+
+Start cheap, escalate only when needed:
+
+```json
+{
+  "model_preferences": {
+    "quick_fixes": "haiku",
+    "features": "sonnet",
+    "refactors": "sonnet",
+    "architecture": "opus",
+    "debugging": "sonnet"
+  }
+}
+```
+
+### Strategy 2: Performance First
+
+Use powerful models for everything (faster iteration, higher cost):
+
+```json
+{
+  "model_preferences": {
+    "quick_fixes": "sonnet",
+    "features": "opus",
+    "refactors": "opus",
+    "architecture": "opus",
+    "debugging": "opus"
+  }
+}
+```
+
+### Strategy 3: Balanced (Recommended)
+
+Optimize for both cost and capability:
+
+```json
+{
+  "model_preferences": {
+    "quick_fixes": "haiku",
+    "features": "sonnet",
+    "refactors": "opus",
+    "architecture": "opus",
+    "debugging": "opus"
+  }
+}
+```
+
+## Performance Comparison
+
+### Token Generation Speed
+
+| Model | Tokens/sec (est) | 1000 token response |
+|-------|-----------------|--------------------|
+| Haiku | ~100 | ~10 seconds |
+| Sonnet | ~60 | ~17 seconds |
+| Opus | ~40 | ~25 seconds |
+
+<Note>
+Speed varies by context size, complexity, and API load. These are approximate averages.
+</Note>
+
+### Quality vs Speed Tradeoff
+
+```text
+         Quality
+            ↑
+     Opus   │     ●
+            │
+   Sonnet   │   ●
+            │
+    Haiku   │ ●
+            │
+            └─────────────→ Speed
+```
+
+For most development work, **Sonnet** hits the sweet spot.
+
+## Monitoring Usage
+
+Track model usage and costs:
+
+```bash
+# Check current session cost
+/cost
+
+# View usage stats
+/usage
+
+# Check extra usage (overflow)
+/extra-usage
+```
+
+### Budget Controls
+
+```bash
+# Set budget cap for session
+claude --max-budget-usd 5.00
+
+# Limit total turns (indirect cost control)
+claude --max-turns 50
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Match Task Complexity" icon="balance-scale">
+    Use Haiku for simple tasks, Opus for complex reasoning. Don't overspend on trivial edits.
+  </Card>
+  
+  <Card title="Fast Feedback Loops" icon="rotate">
+    Haiku in hooks for instant validation. Opus only when deep analysis is required.
+  </Card>
+  
+  <Card title="Agent Specialization" icon="users">
+    Create focused agents with appropriate models. Quick-fix agents use Haiku, architects use Opus.
+  </Card>
+  
+  <Card title="Monitor and Adjust" icon="chart-line">
+    Track costs with `/usage` and `/cost`. Adjust preferences based on actual spending patterns.
+  </Card>
+</CardGroup>
+
+## Example Configurations
+
+<CodeGroup>
+```json Cost-conscious team
+{
+  "model_preferences": {
+    "quick_fixes": "haiku",
+    "features": "sonnet",
+    "refactors": "sonnet",
+    "architecture": "sonnet",
+    "debugging": "sonnet"
+  }
+}
+```
+
+```json High-stakes production
+{
+  "model_preferences": {
+    "quick_fixes": "sonnet",
+    "features": "opus",
+    "refactors": "opus",
+    "architecture": "opus",
+    "debugging": "opus"
+  }
+}
+```
+
+```json Prototyping (speed matters)
+{
+  "model_preferences": {
+    "quick_fixes": "haiku",
+    "features": "haiku",
+    "refactors": "sonnet",
+    "architecture": "sonnet",
+    "debugging": "sonnet"
+  }
+}
+```
+
+```json Balanced (recommended)
+{
+  "model_preferences": {
+    "quick_fixes": "haiku",
+    "features": "sonnet",
+    "refactors": "opus",
+    "architecture": "opus",
+    "debugging": "opus"
+  }
+}
+```
+</CodeGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Model preferences not being respected">
+    **Cause**: Explicit model set via CLI or `/model` command overrides preferences
+    
+    **Fix**: Remove CLI `--model` flag or reset with `/model auto`
+  </Accordion>
+  
+  <Accordion title="Unexpected high costs">
+    **Cause**: All tasks routing to Opus due to misconfiguration
+    
+    **Fix**: Review preferences and ensure Haiku/Sonnet are used for simpler tasks. Check `/cost` frequently.
+  </Accordion>
+  
+  <Accordion title="Poor quality with Haiku">
+    **Cause**: Task too complex for Haiku's capabilities
+    
+    **Fix**: Reclassify task or manually switch to Sonnet/Opus for current session
+  </Accordion>
+  
+  <Accordion title="Preferences file not loading">
+    **Cause**: `config.json` not in expected location or has syntax errors
+    
+    **Fix**: Validate JSON syntax and ensure file is in project root or `~/.claude/`
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Settings" icon="gear" href="/configuration/settings">
+    Configure core Claude Code behavior
+  </Card>
+  <Card title="Quality Gates" icon="shield-check" href="/configuration/quality-gates">
+    Set up validation checkpoints
+  </Card>
+  <Card title="Agent Configuration" icon="robot" href="/agents/configuration">
+    Create specialized agents with model preferences
+  </Card>
+  <Card title="Cost Management" icon="dollar-sign" href="/workflow/cost-management">
+    Learn advanced cost optimization techniques
+  </Card>
+</CardGroup>

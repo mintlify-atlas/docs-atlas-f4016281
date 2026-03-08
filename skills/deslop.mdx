@@ -1,0 +1,654 @@
+---
+title: 'Deslop'
+description: 'Remove AI-generated code slop, unnecessary comments, and over-engineering from your branch'
+icon: 'broom'
+---
+
+## Overview
+
+Deslop removes AI-generated code bloat from your branch before committing. It checks the diff against main and cleans up unnecessary comments, defensive code, premature abstractions, and over-engineering that AI agents tend to add.
+
+<Note>
+**"Three similar lines of code is better than a premature abstraction."** — Clean up the slop.
+</Note>
+
+## Trigger
+
+Use when:
+- After completing changes, before committing
+- Code feels over-engineered or has AI smell
+- Before code review or PR
+- Cleaning up after exploratory development
+
+<CodeGroup>
+```bash Claude Code
+/deslop
+/pro-workflow:deslop
+```
+
+```bash Cursor
+# Skill is available automatically
+"clean up this code"
+"remove the slop"
+"simplify before committing"
+```
+</CodeGroup>
+
+## Workflow
+
+<Steps>
+  <Step title="Run Diff">
+    See all changes on the branch
+    
+    ```bash
+    git fetch origin main
+    git diff origin/main...HEAD --stat
+    git diff origin/main...HEAD
+    ```
+  </Step>
+  
+  <Step title="Identify Slop">
+    Find patterns from the focus areas (see below)
+  </Step>
+  
+  <Step title="Apply Minimal Edits">
+    Make focused, minimal edits to remove slop
+  </Step>
+  
+  <Step title="Verify">
+    Re-run diff to verify only slop was removed
+    
+    ```bash
+    git diff origin/main...HEAD
+    ```
+  </Step>
+  
+  <Step title="Test">
+    Confirm behavior unchanged
+    
+    ```bash
+    npm test -- --changed --passWithNoTests 2>&1 | tail -10
+    ```
+  </Step>
+  
+  <Step title="Summarize">
+    What was cleaned (1-3 sentences)
+  </Step>
+</Steps>
+
+## Focus Areas
+
+Deslop identifies and removes these patterns:
+
+<AccordionGroup>
+  <Accordion title="Obvious Comments" icon="comment">
+    Comments that state what the code already says
+    
+    **Remove:**
+    ```typescript
+    // Increment the counter
+    counter++;
+    
+    // Return the user object
+    return user;
+    
+    // Loop through items
+    for (const item of items) {
+    ```
+    
+    **Keep:**
+    ```typescript
+    // Hash password with bcrypt (rounds=10) to prevent timing attacks
+    const hash = await bcrypt.hash(password, 10);
+    
+    // Use XOR cipher to match legacy API format (remove after v2 migration)
+    const encrypted = xorEncrypt(data);
+    ```
+  </Accordion>
+  
+  <Accordion title="Defensive Try/Catch" icon="shield">
+    Try/catch blocks for trusted internal code paths
+    
+    **Remove:**
+    ```typescript
+    // In internal helper function
+    try {
+      const result = JSON.parse(jsonString);
+      return result;
+    } catch (error) {
+      console.error('Parse failed:', error);
+      return null;
+    }
+    ```
+    
+    **Keep:**
+    ```typescript
+    // For external API calls or user input
+    try {
+      const response = await fetch(externalApi);
+      return await response.json();
+    } catch (error) {
+      logger.error('External API failed', error);
+      throw new ExternalServiceError(error);
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Any Casts" icon="magic-wand-sparkles">
+    Using `any` to bypass type issues instead of fixing them
+    
+    **Remove:**
+    ```typescript
+    const data = response as any;
+    const value = (input as any).someProperty;
+    ```
+    
+    **Fix:**
+    ```typescript
+    const data = response as UserResponse;
+    const value = isInputWithProperty(input) ? input.someProperty : undefined;
+    ```
+  </Accordion>
+  
+  <Accordion title="Premature Abstractions" icon="cubes">
+    Helpers, factories, or abstractions used only once
+    
+    **Remove:**
+    ```typescript
+    // Used only once
+    function createUserValidator() {
+      return (user: User) => {
+        return user.email && user.name;
+      };
+    }
+    
+    const validator = createUserValidator();
+    if (!validator(user)) {
+      throw new Error('Invalid user');
+    }
+    ```
+    
+    **Inline:**
+    ```typescript
+    if (!user.email || !user.name) {
+      throw new Error('Invalid user');
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Deeply Nested Code" icon="diagram-nested">
+    Nested conditions that should use early returns
+    
+    **Remove:**
+    ```typescript
+    function processUser(user: User | null) {
+      if (user) {
+        if (user.isActive) {
+          if (user.email) {
+            return sendEmail(user.email);
+          }
+        }
+      }
+      return null;
+    }
+    ```
+    
+    **Flatten:**
+    ```typescript
+    function processUser(user: User | null) {
+      if (!user) return null;
+      if (!user.isActive) return null;
+      if (!user.email) return null;
+      return sendEmail(user.email);
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Backwards-Compatibility Hacks" icon="clock-rotate-left">
+    Renamed vars, re-exports, "removed" comments
+    
+    **Remove:**
+    ```typescript
+    // Legacy export for backwards compatibility
+    export const oldFunctionName = newFunctionName;
+    
+    // Renamed but keeping old reference
+    const _deprecatedVar = newVar;
+    
+    // // Removed old implementation
+    // function oldWay() { ... }
+    ```
+    
+    **Clean:**
+    ```typescript
+    // Just the new implementation
+    export const newFunctionName = ...;
+    ```
+  </Accordion>
+  
+  <Accordion title="Scope Creep" icon="circle-plus">
+    Features, refactoring, or improvements beyond what was requested
+    
+    **Remove:**
+    ```diff
+    # Original task: Add login endpoint
+    
+    + feat: add login endpoint
+    + feat: add password reset endpoint  # Not requested
+    + refactor: extract auth helpers      # Not requested
+    + docs: add API documentation         # Not requested
+    ```
+    
+    If you added unrequested features, either:
+    1. Remove them (preferred)
+    2. Commit separately with justification
+  </Accordion>
+  
+  <Accordion title="Added Documentation on Unchanged Code" icon="file-lines">
+    Docstrings, type annotations, or comments on code that wasn't changed
+    
+    **Remove:**
+    ```typescript
+    // File: src/utils/old-code.ts
+    // You only changed one function, but added docs to all functions
+    
+    - function existingFunction() { ... }  // Unchanged
+    + /**
+    +  * Existing function that does X
+    +  * @returns Y
+    +  */
+    + function existingFunction() { ... }  // Still unchanged
+    ```
+  </Accordion>
+  
+  <Accordion title="Impossible Error Handling" icon="triangle-exclamation">
+    Error handling for scenarios that can't happen in trusted code
+    
+    **Remove:**
+    ```typescript
+    // In internal function with typed parameters
+    function add(a: number, b: number): number {
+      if (typeof a !== 'number' || typeof b !== 'number') {
+        throw new Error('Parameters must be numbers');
+      }
+      return a + b;
+    }
+    ```
+    
+    **Keep:**
+    ```typescript
+    // Simple and trusts the type system
+    function add(a: number, b: number): number {
+      return a + b;
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Guardrails
+
+<Warning>
+**Critical rules when deslopping:**
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="Keep Behavior Unchanged" icon="lock">
+    Unless fixing a clear bug, behavior must stay the same. Don't "improve" while cleaning.
+  </Card>
+  <Card title="Minimal Edits" icon="minus">
+    Prefer focused edits over broad rewrites. Remove slop, don't refactor.
+  </Card>
+  <Card title="Three Lines > Abstraction" icon="code">
+    Three similar lines is better than a premature abstraction. Inline one-use helpers.
+  </Card>
+  <Card title="Verify Unused Before Removing" icon="check">
+    If removing code, grep to verify it's truly unused first.
+  </Card>
+</CardGroup>
+
+## Output
+
+Deslop provides:
+
+1. **List of slop patterns found** with file locations
+2. **Edits applied** to remove slop
+3. **One-line summary** of what was cleaned
+
+```text
+DESLOP REPORT
+=============
+
+Slop patterns found (5 instances):
+
+1. Obvious comments (3 files)
+   - src/api/users.ts:12 "// Return user object"
+   - src/api/users.ts:34 "// Loop through items"
+   - src/utils/format.ts:8 "// Convert to string"
+
+2. Premature abstraction (1 file)
+   - src/utils/validators.ts:15 createValidator() used only once
+   
+3. Any cast (1 file)
+   - src/api/auth.ts:42 "response as any"
+
+Applying minimal edits...
+
+✓ Removed 3 obvious comments
+✓ Inlined createValidator() (1 use)
+✓ Fixed type cast to UserResponse
+
+Verifying changes...
+git diff origin/main...HEAD --stat
+  src/api/users.ts    | 2 --
+  src/api/auth.ts     | 2 +-
+  src/utils/format.ts | 1 -
+  src/utils/validators.ts | 8 +-------
+  4 files changed, 2 insertions(+), 11 deletions(-)
+
+Running tests...
+✓ Tests: 23 passed
+
+=============
+Cleaned: Removed obvious comments, inlined one-use validator, fixed any cast.
+```
+
+## Examples
+
+### Example 1: Obvious Comments
+
+```bash
+User: "Clean up this code before I commit"
+
+Claude: Checking for slop in branch diff...
+
+Found: 5 obvious comments
+
+Before:
+```typescript
+// Get the user from database
+const user = await db.users.findOne({ id });
+
+// Check if user exists
+if (!user) {
+  throw new Error('User not found');
+}
+
+// Return the user object
+return user;
+```
+
+After:
+```typescript
+const user = await db.users.findOne({ id });
+if (!user) {
+  throw new Error('User not found');
+}
+return user;
+```
+
+Removed 3 obvious comments. Tests passing.
+```
+
+### Example 2: Premature Abstraction
+
+```bash
+User: "This feels over-engineered"
+
+Claude: Checking for premature abstractions...
+
+Found: Helper function used only once
+
+Before (src/api/users.ts):
+```typescript
+function createEmailValidator() {
+  return (email: string) => {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email);
+  };
+}
+
+const validateEmail = createEmailValidator();
+
+if (!validateEmail(user.email)) {
+  throw new Error('Invalid email');
+}
+```
+
+After:
+```typescript
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+if (!emailRegex.test(user.email)) {
+  throw new Error('Invalid email');
+}
+```
+
+Removed factory function (used only once). Tests passing.
+```
+
+### Example 3: Defensive Code
+
+```bash
+User: "Remove unnecessary error handling"
+
+Claude: Checking for defensive try/catch in internal code...
+
+Found: 2 unnecessary try/catch blocks
+
+Before (src/utils/format.ts - internal helper):
+```typescript
+function formatDate(date: Date): string {
+  try {
+    return date.toISOString();
+  } catch (error) {
+    console.error('Date format failed:', error);
+    return '';
+  }
+}
+```
+
+This is an internal helper with typed input. The try/catch is unnecessary.
+
+After:
+```typescript
+function formatDate(date: Date): string {
+  return date.toISOString();
+}
+```
+
+Removed defensive try/catch from internal helpers. Tests passing.
+```
+
+### Example 4: Nested Code
+
+```bash
+User: "Flatten this nested logic"
+
+Claude: Simplifying nested conditions with early returns...
+
+Before:
+```typescript
+function processOrder(order: Order | null) {
+  if (order) {
+    if (order.isPaid) {
+      if (order.items.length > 0) {
+        if (order.shippingAddress) {
+          return shipOrder(order);
+        } else {
+          throw new Error('No shipping address');
+        }
+      } else {
+        throw new Error('No items');
+      }
+    } else {
+      throw new Error('Order not paid');
+    }
+  } else {
+    throw new Error('No order');
+  }
+}
+```
+
+After:
+```typescript
+function processOrder(order: Order | null) {
+  if (!order) throw new Error('No order');
+  if (!order.isPaid) throw new Error('Order not paid');
+  if (order.items.length === 0) throw new Error('No items');
+  if (!order.shippingAddress) throw new Error('No shipping address');
+  
+  return shipOrder(order);
+}
+```
+
+Flattened nested conditions. Logic unchanged. Tests passing.
+```
+
+## Integration with Pro Workflow
+
+<CardGroup cols={2}>
+  <Card title="Smart Commit" icon="code-commit" href="/skills/smart-commit">
+    Run deslop before smart-commit for clean commits
+  </Card>
+  <Card title="Wrap-Up" icon="check-circle" href="/skills/wrap-up">
+    Wrap-up can trigger deslop during quality check
+  </Card>
+  <Card title="Orchestrate" icon="diagram-project" href="/skills/orchestrate">
+    Review phase includes deslop before committing
+  </Card>
+  <Card title="Learn Rule" icon="graduation-cap" href="/skills/learn-rule">
+    Capture patterns: "Don't add obvious comments"
+  </Card>
+</CardGroup>
+
+## Configuration
+
+### Auto-Deslop Before Commit
+
+Add to CLAUDE.md:
+
+```markdown
+## Before Commits
+
+1. Run /deslop to remove AI slop
+2. Run quality gates
+3. Commit with /smart-commit
+```
+
+### Custom Slop Patterns
+
+Add project-specific patterns to detect:
+
+```markdown
+## Deslop Patterns
+
+Also remove:
+- Logger statements in pure functions
+- Timezone conversions (we use UTC only)
+- Null checks for non-nullable types
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Run After AI Sessions" icon="robot">
+    AI agents tend to add defensive code and obvious comments. Clean up after each session.
+  </Accordion>
+  
+  <Accordion title="Before Code Review" icon="code-pull-request">
+    Reviewers will thank you for removing the bloat before they see it.
+  </Accordion>
+  
+  <Accordion title="Test After Cleaning" icon="vial">
+    Always run tests after deslop. Ensure behavior unchanged.
+  </Accordion>
+  
+  <Accordion title="Don't Over-Clean" icon="hand">
+    Remove slop, don't refactor. Save refactoring for a dedicated task.
+  </Accordion>
+</AccordionGroup>
+
+## What to Keep
+
+Not all AI-generated code is slop. **Keep:**
+
+<AccordionGroup>
+  <Accordion title="Non-Obvious Comments" icon="circle-check">
+    ```typescript
+    // Use XOR to match legacy API (remove after v2 migration)
+    // Hash with rounds=10 to prevent timing attacks
+    // HACK: Workaround for Safari bug #12345
+    ```
+  </Accordion>
+  
+  <Accordion title="External API Error Handling" icon="circle-check">
+    ```typescript
+    try {
+      const response = await fetch(externalApi);
+      return response.json();
+    } catch (error) {
+      logger.error('External API failed', error);
+      throw new ServiceUnavailableError();
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="User Input Validation" icon="circle-check">
+    ```typescript
+    if (!email || typeof email !== 'string') {
+      throw new ValidationError('Email required');
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Abstractions Used 3+ Times" icon="circle-check">
+    ```typescript
+    // Used in 5 places
+    function validateUser(user: User) {
+      if (!user.email || !user.name) {
+        throw new ValidationError('Invalid user');
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### Tests Fail After Deslop
+
+If tests fail after cleaning:
+1. Revert the last deslop edit
+2. Investigate why the "slop" was actually needed
+3. Add a comment explaining why (non-obvious case)
+
+### Too Aggressive
+
+If deslop removes code that should stay:
+1. Review the diff carefully before committing
+2. Restore removed code with comment explaining why needed
+3. Update deslop patterns to skip this case
+
+### Not Finding Slop
+
+If deslop reports no issues but code feels bloated:
+1. Manually review the diff for patterns not in the list
+2. Use `git diff origin/main...HEAD` to check yourself
+3. Add new patterns to your CLAUDE.md deslop config
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Try Smart Commit" icon="code-commit" href="/skills/smart-commit">
+    Commit clean code with quality gates
+  </Card>
+  <Card title="Learn Pro Workflow" icon="star" href="/skills/pro-workflow">
+    Master the complete workflow system
+  </Card>
+  <Card title="Master Wrap-Up" icon="check-circle" href="/skills/wrap-up">
+    Include deslop in your end-of-session ritual
+  </Card>
+  <Card title="View All Skills" icon="puzzle-piece" href="/skills/overview">
+    Explore the complete skill system
+  </Card>
+</CardGroup>

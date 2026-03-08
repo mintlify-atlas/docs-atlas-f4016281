@@ -1,0 +1,466 @@
+---
+title: Settings Configuration
+description: Complete reference for configuring Claude Code settings, permissions, and behavior
+---
+
+## Overview
+
+Settings control permissions, behavior, output style, and integrations in Claude Code. Configuration follows a hierarchy where more specific settings override broader ones.
+
+## Settings Hierarchy
+
+Settings are evaluated in order, with the first match winning:
+
+```text
+1. CLI flags              --permission-mode, --max-budget-usd
+2. .claude/settings.local.json   Project-local (gitignored)
+3. .claude/settings.json         Project-shared (committed)
+4. ~/.claude/settings.local.json  User-local (personal)
+5. ~/.claude/settings.json        User-global
+6. managed-settings.json          Enterprise policy (read-only)
+```
+
+<Note>
+Project settings override user settings. CLI flags override everything. Use `.local.json` for personal preferences and secrets.
+</Note>
+
+## Permission Modes
+
+Control how Claude Code requests approval for operations.
+
+<ParamField path="permissionMode" type="string" default="default">
+  Permission level for tool usage
+  
+  | Mode | Behavior |
+  |------|----------|
+  | `default` | Ask for dangerous operations |
+  | `acceptEdits` | Auto-approve file edits, ask for shell |
+  | `askEdits` | Ask for everything including edits |
+  | `dontAsk` | Auto-approve everything (trusted environments) |
+  | `viewOnly` | Read-only, no modifications |
+  | `bypassPermissions` | Skip all checks (CI/CD only) |
+  | `plan` | Research and plan, require approval to execute |
+</ParamField>
+
+### Set via CLI
+
+```bash
+claude --permission-mode plan
+claude --permission-mode dontAsk
+```
+
+## Permission Rules
+
+Fine-grained control over tool access using allow/deny/ask rules.
+
+<CodeGroup>
+```json settings.json
+{
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(curl * | bash)",
+      "Bash(wget * | sh)",
+      "Edit(/vendor/**)",
+      "Edit(/node_modules/**)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(git reset *)",
+      "Bash(docker *)",
+      "Bash(npm publish *)",
+      "Bash(npx * deploy *)"
+    ],
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Edit",
+      "Write",
+      "Bash(npm run *)",
+      "Bash(pnpm *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(node *)",
+      "Bash(npx jest *)",
+      "Bash(npx vitest *)",
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "MCP(github:*)",
+      "MCP(context7:*)",
+      "Task(*)",
+      "Agent(*)"
+    ]
+  }
+}
+```
+</CodeGroup>
+
+### Wildcard Syntax
+
+Permission rules support glob patterns for flexible matching:
+
+| Pattern | Matches |
+|---------|--------|
+| `Bash(npm run *)` | Any npm script |
+| `Edit(/src/**)` | Any file under src/ recursively |
+| `WebFetch(domain:*.github.com)` | Any GitHub subdomain |
+| `MCP(github:*)` | Any tool from github MCP server |
+| `Task(planner)` | Only the planner subagent |
+| `Agent(*)` | Any agent type |
+
+<Warning>
+Rules are evaluated in order: `deny` > `ask` > `allow`. A denied operation cannot be overridden by allow rules.
+</Warning>
+
+## Core Settings
+
+### Output Style
+
+<ParamField path="outputStyle" type="string" default="Explanatory">
+  Controls verbosity and tone of Claude's responses
+  
+  - `"Concise"` - Minimal explanations, action-focused
+  - `"Explanatory"` - Balanced context and detail
+  - `"Learning"` - Educational mode with extra context
+  - `"Custom:<instructions>"` - Custom output instructions
+</ParamField>
+
+```json
+{
+  "outputStyle": "Concise"
+}
+```
+
+### Status Line
+
+<ParamField path="statusLine" type="string" default="model branch tokens">
+  Configure the status bar display
+  
+  Space-separated list of: `model`, `branch`, `tokens`, `cost`, `time`
+</ParamField>
+
+```json
+{
+  "statusLine": "model branch tokens"
+}
+```
+
+### Plans Directory
+
+<ParamField path="plansDirectory" type="string" default=".claude/plans">
+  Directory for storing plan mode artifacts
+</ParamField>
+
+```json
+{
+  "plansDirectory": ".claude/plans"
+}
+```
+
+### File Suggestion
+
+<ParamField path="fileSuggestion" type="boolean" default="true">
+  Enable automatic file suggestions during conversation
+</ParamField>
+
+### Fast Mode
+
+<ParamField path="fastMode" type="boolean" default="false">
+  Enable fast mode by default (billed to extra usage)
+</ParamField>
+
+### Reduced Motion
+
+<ParamField path="prefersReducedMotion" type="boolean" default="false">
+  Disable animations and spinners for accessibility
+</ParamField>
+
+## Context Management
+
+### Auto-Compact Threshold
+
+<ParamField path="env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE" type="string" default="95">
+  Trigger automatic compaction at this percentage of context window
+  
+  Lower values (50-80) enable more proactive compaction for long sessions.
+</ParamField>
+
+```json
+{
+  "env": {
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80"
+  }
+}
+```
+
+<Accordion title="Why lower the threshold?">
+Default auto-compact triggers at ~95% context usage. Setting it lower (e.g., `50` or `80`) causes Claude to proactively compact context more frequently, which is useful for long sessions or complex codebases.
+</Accordion>
+
+## UI Customization
+
+### Spinner Verbs
+
+<ParamField path="spinnerVerbs" type="string[]">
+  Customize loading spinner verbs
+</ParamField>
+
+```json
+{
+  "spinnerVerbs": [
+    "Thinking",
+    "Analyzing",
+    "Exploring",
+    "Investigating",
+    "Crafting",
+    "Reviewing"
+  ]
+}
+```
+
+### Spinner Tips
+
+<ParamField path="spinnerTipsOverride" type="string[]">
+  Override default loading tips
+</ParamField>
+
+```json
+{
+  "spinnerTipsOverride": [
+    "Use /compact at task boundaries to keep context fresh",
+    "Shift+Tab cycles modes: Normal > Auto > Plan",
+    "Ctrl+B sends the current task to background",
+    "Use subagents for parallel exploration",
+    "claude -w creates an instant parallel worktree session",
+    "Voice mode: /voice then hold spacebar to talk",
+    "Esc Esc rewinds to the last checkpoint",
+    "Write tests alongside code for better AI output",
+    "/doctor diagnoses configuration issues"
+  ]
+}
+```
+
+## Attribution
+
+<ParamField path="attribution.commitMessage" type="string">
+  Template for commit attribution footer
+</ParamField>
+
+<ParamField path="attribution.prDescription" type="string">
+  Template for pull request attribution footer
+</ParamField>
+
+```json
+{
+  "attribution": {
+    "commitMessage": "",
+    "prDescription": ""
+  }
+}
+```
+
+<Note>
+Set to empty strings to disable "Co-Authored-By" footers in commits and PRs.
+</Note>
+
+## Sandbox Configuration
+
+<ParamField path="sandbox.filesystem" type="object">
+  Filesystem access restrictions
+</ParamField>
+
+<ParamField path="sandbox.network" type="object">
+  Network access restrictions
+</ParamField>
+
+```json
+{
+  "sandbox": {
+    "filesystem": {
+      "allow": ["/home/user/project"],
+      "deny": ["/etc", "/root"]
+    },
+    "network": {
+      "allowDomains": ["api.github.com", "registry.npmjs.org"],
+      "denyDomains": ["*"]
+    }
+  }
+}
+```
+
+## Environment Variables
+
+Key environment variables that affect Claude Code behavior:
+
+| Variable | Purpose |
+|----------|--------|
+| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | Trigger compaction earlier (default ~95) |
+| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | Enable agent teams feature |
+| `CLAUDE_CODE_TMPDIR` | Custom temp directory |
+| `DISABLE_AUTOUPDATER` | Prevent automatic updates |
+| `CLAUDE_CODE_SIMPLE` | Simplified output mode |
+| `CLAUDE_SESSION_ID` | Custom session identifier |
+
+```json
+{
+  "env": {
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  }
+}
+```
+
+## Scope: Global vs Project
+
+Understand what configuration lives where:
+
+| Feature | Global Only | Dual Scope |
+|---------|:-----------:|:----------:|
+| Tasks & Task Lists | ✓ | |
+| Agent Teams | ✓ | |
+| Auto Memory | ✓ | |
+| Credentials/Auth | ✓ | |
+| Keybindings | ✓ | |
+| MCP User Servers | ✓ | |
+| CLAUDE.md | | ✓ |
+| Settings | | ✓ |
+| Agents | | ✓ |
+| Commands | | ✓ |
+| Skills | | ✓ |
+| Hooks | | ✓ |
+| MCP Project Servers | | ✓ |
+| Rules | | ✓ |
+
+- **Global** = `~/.claude/`
+- **Project** = `.claude/`
+
+## Production Example
+
+<CodeGroup>
+```json settings.example.json
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(curl * | bash)",
+      "Bash(wget * | sh)",
+      "Edit(/vendor/**)",
+      "Edit(/node_modules/**)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(git reset *)",
+      "Bash(docker *)",
+      "Bash(npm publish *)",
+      "Bash(npx * deploy *)"
+    ],
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Edit",
+      "Write",
+      "Bash(npm run *)",
+      "Bash(pnpm *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(node *)",
+      "Bash(npx jest *)",
+      "Bash(npx vitest *)",
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "MCP(github:*)",
+      "MCP(context7:*)",
+      "Task(*)",
+      "Agent(*)"
+    ]
+  },
+  "outputStyle": "Explanatory",
+  "statusLine": "model branch tokens",
+  "plansDirectory": ".claude/plans",
+  "enableAllProjectMcpServers": false,
+  "attribution": {
+    "commitMessage": "",
+    "prDescription": ""
+  },
+  "env": {
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80"
+  },
+  "spinnerVerbs": [
+    "Thinking",
+    "Analyzing",
+    "Exploring",
+    "Investigating",
+    "Crafting",
+    "Reviewing"
+  ],
+  "spinnerTipsOverride": [
+    "Use /compact at task boundaries to keep context fresh",
+    "Shift+Tab cycles modes: Normal > Auto > Plan",
+    "Ctrl+B sends the current task to background",
+    "Use subagents for parallel exploration",
+    "claude -w creates an instant parallel worktree session",
+    "Voice mode: /voice then hold spacebar to talk",
+    "Esc Esc rewinds to the last checkpoint",
+    "Write tests alongside code for better AI output",
+    "/doctor diagnoses configuration issues"
+  ]
+}
+```
+</CodeGroup>
+
+## CLI Flags
+
+Override settings with command-line arguments:
+
+```bash
+# Permission mode
+claude --permission-mode plan
+claude --permission-mode dontAsk
+
+# Budget control
+claude --max-budget-usd 5.00
+claude --max-turns 50
+
+# Output mode
+claude --print "fix linting errors" --max-turns 10
+
+# Remote access
+claude --remote
+
+# Worktree session
+claude -w
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="MCP Servers" icon="plug" href="/configuration/mcp-servers">
+    Configure Model Context Protocol integrations
+  </Card>
+  <Card title="Quality Gates" icon="shield-check" href="/configuration/quality-gates">
+    Set up automated validation checks
+  </Card>
+  <Card title="Model Preferences" icon="brain" href="/configuration/model-preferences">
+    Configure task-specific model routing
+  </Card>
+</CardGroup>

@@ -1,0 +1,496 @@
+---
+title: Skill Preloading
+description: Load skills into agent context at startup for instant availability
+---
+
+Skill preloading injects full skill content into agent context when the agent starts. This gives agents domain-specific knowledge without requiring invocation or context loading during execution.
+
+## Why Preload?
+
+<CardGroup cols={2}>
+  <Card title="Instant Availability" icon="bolt">
+    Skills are loaded once at startup, not fetched during execution.
+  </Card>
+  <Card title="Consistent Knowledge" icon="circle-check">
+    Every agent invocation has the same baseline knowledge.
+  </Card>
+  <Card title="No Invocation Needed" icon="wand-magic">
+    Agent can reference skill content in every response automatically.
+  </Card>
+  <Card title="Context Efficiency" icon="gauge">
+    Load once vs. repeatedly fetching during conversation.
+  </Card>
+</CardGroup>
+
+## Basic Preloading
+
+```yaml
+---
+name: orchestrator
+skills: ["pro-workflow", "api-conventions"]
+---
+
+Agent starts with Pro Workflow and API conventions already loaded.
+```
+
+**What happens:**
+1. Agent invoked (e.g., "Delegate to orchestrator")
+2. Claude Code reads `skills/pro-workflow/SKILL.md`
+3. Claude Code reads `skills/api-conventions/SKILL.md`
+4. Full content of both skills injected into agent context
+5. Agent begins execution with skills available
+
+## Preloading vs On-Demand
+
+| Feature | Preloaded | On-Demand |
+|---------|-----------|----------|
+| **Load Time** | Agent startup | When invoked |
+| **Availability** | Always | After invocation |
+| **Context Cost** | Upfront | Deferred |
+| **Use Case** | Core knowledge | Occasional procedures |
+| **Invocation** | None needed | `/skill` or `Skill()` |
+
+## Load Order
+
+Skills load in the order specified:
+
+```yaml
+---
+name: implementer
+skills:
+  - "project-patterns"      # Loaded first
+  - "api-conventions"       # Loaded second
+  - "error-handling"        # Loaded third
+---
+```
+
+<Info>
+  If skills reference each other, list dependencies first.
+</Info>
+
+## Context Injection
+
+Preloaded skills are injected as:
+
+```text
+Agent System Prompt:
+
+[Agent instructions from AGENT.md]
+
+---
+
+Preloaded Skills:
+
+# Skill: pro-workflow
+
+[Full content of skills/pro-workflow/SKILL.md]
+
+---
+
+# Skill: api-conventions
+
+[Full content of skills/api-conventions/SKILL.md]
+
+---
+```
+
+## Examples
+
+### Planning Agent with Project Patterns
+
+```yaml
+---
+name: planner
+tools: ["Read", "Glob", "Grep"]
+skills: ["project-patterns"]
+model: opus
+---
+
+# Planner
+
+Create implementation plans following project patterns.
+```
+
+**Skill:** `skills/project-patterns/SKILL.md`
+
+```markdown
+---
+name: project-patterns
+description: Common patterns in this codebase
+---
+
+# Project Patterns
+
+## File Organization
+
+- `src/routes/` — API endpoints
+- `src/services/` — Business logic
+- `src/db/` — Database queries
+
+## API Endpoint Pattern
+
+```typescript
+export async function handler(req: Request, res: Response) {
+  const validation = validateInput(req.body);
+  if (!validation.success) {
+    return res.status(400).json({ error: validation.error });
+  }
+  const result = await service.execute(validation.data);
+  return res.status(200).json(result);
+}
+```
+```
+
+Now when planner creates plans, it knows:
+- Where to place files
+- How to structure endpoints
+- Validation patterns to use
+
+### Orchestrator with Multiple Skills
+
+```yaml
+---
+name: orchestrator
+tools: ["Read", "Glob", "Grep", "Bash", "Edit", "Write"]
+skills:
+  - "pro-workflow"
+  - "project-patterns"
+  - "testing-strategy"
+model: opus
+memory: project
+---
+
+# Orchestrator
+
+Multi-phase development with Pro Workflow patterns, project structure knowledge, and testing strategy.
+```
+
+Orchestrator starts with:
+1. **pro-workflow** — Research > Plan > Implement workflow
+2. **project-patterns** — File organization and code patterns
+3. **testing-strategy** — When/how to write tests
+
+### Reviewer with Security Checklist
+
+```yaml
+---
+name: reviewer
+tools: ["Read", "Grep", "Bash"]
+skills: ["security-checklist", "performance-patterns"]
+---
+
+# Reviewer
+
+Code review with security and performance focus.
+```
+
+**Skills:**
+
+<CodeGroup>
+
+```markdown security-checklist
+---
+name: security-checklist
+description: Security items to verify
+---
+
+# Security Checklist
+
+## Input Validation
+- [ ] All inputs validated
+- [ ] SQL injection prevented
+- [ ] XSS prevention
+
+## Authentication
+- [ ] Passwords hashed
+- [ ] JWT expiry set
+- [ ] CSRF tokens present
+
+## Secrets
+- [ ] No secrets in code
+- [ ] Environment variables only
+```
+
+```markdown performance-patterns
+---
+name: performance-patterns
+description: Performance anti-patterns
+---
+
+# Performance Patterns
+
+## Anti-Patterns
+
+- N+1 queries (use joins or batch)
+- O(n^2) loops (optimize algorithm)
+- Large payloads (paginate)
+- Blocking I/O (use async)
+
+## Best Practices
+
+- Index database columns
+- Cache expensive queries
+- Use CDN for static assets
+```
+
+</CodeGroup>
+
+Reviewer automatically checks all items without being told.
+
+## Context Budget
+
+### Skill Size Guidelines
+
+<Accordion title="Small (<500 tokens)">
+
+```markdown
+---
+name: naming-conventions
+---
+
+# Naming
+
+- camelCase: variables
+- PascalCase: classes
+- kebab-case: files
+```
+
+**Impact:** Negligible (~50 tokens)
+
+</Accordion>
+
+<Accordion title="Medium (500-2000 tokens)">
+
+```markdown
+---
+name: api-conventions
+---
+
+# API Conventions
+
+[Detailed patterns with examples]
+```
+
+**Impact:** Moderate (~200-500 tokens)
+
+</Accordion>
+
+<Accordion title="Large (>2000 tokens)">
+
+```markdown
+---
+name: complete-architecture
+---
+
+# Complete Architecture Guide
+
+[Extensive documentation]
+```
+
+**Impact:** High (>500 tokens)
+
+**Recommendation:** Split into smaller skills or use on-demand.
+
+</Accordion>
+
+### Total Context Budget
+
+<ParamField path="Base Context" type="number" default="200000">
+  Claude Code context window: 200k tokens
+</ParamField>
+
+<ParamField path="Agent Prompt" type="number" default="500-2000">
+  Agent system prompt: 500-2000 tokens
+</ParamField>
+
+<ParamField path="Preloaded Skills" type="number" default="1000-5000">
+  3-5 skills: 1000-5000 tokens
+</ParamField>
+
+<ParamField path="Remaining" type="number" default="190000+">
+  Available for conversation: 190k+ tokens
+</ParamField>
+
+<Tip>
+  Limit to 3-5 skills per agent. More than 5000 tokens for skills is excessive.
+</Tip>
+
+## Optimizing Skills
+
+### 1. Concise Language
+
+<Tabs>
+  <Tab title="Verbose (Bad)">
+    ```markdown
+    When you are implementing an API endpoint, it is very important to 
+    remember that you should always validate the user input before you 
+    process it, because if you don't validate the input, the user might 
+    send invalid data and cause errors in your application.
+    ```
+    
+    **Cost:** ~50 tokens
+  </Tab>
+  <Tab title="Concise (Good)">
+    ```markdown
+    Validate input before processing.
+    ```
+    
+    **Cost:** ~5 tokens
+  </Tab>
+</Tabs>
+
+### 2. Examples Over Prose
+
+<Tabs>
+  <Tab title="Prose-Heavy (Bad)">
+    ```markdown
+    ## Error Handling
+    
+    Our application uses custom error classes that extend the base Error 
+    class. Each error has a code property and a statusCode property. The 
+    code is a string identifier like 'NOT_FOUND' and the statusCode is the 
+    HTTP status code to return, like 404.
+    ```
+    
+    **Cost:** ~50 tokens
+  </Tab>
+  <Tab title="Example-Driven (Good)">
+    ```markdown
+    ## Error Handling
+    
+    \`\`\`typescript
+    export class NotFoundError extends Error {
+      code = 'NOT_FOUND';
+      statusCode = 404;
+    }
+    \`\`\`
+    ```
+    
+    **Cost:** ~20 tokens, more effective
+  </Tab>
+</Tabs>
+
+### 3. Split Large Skills
+
+Instead of:
+
+```yaml
+skills: ["complete-api-guide"]  # 3000 tokens
+```
+
+Use:
+
+```yaml
+skills:
+  - "api-routes"           # 500 tokens
+  - "api-auth"             # 500 tokens
+  - "api-errors"           # 500 tokens
+  # Total: 1500 tokens
+```
+
+Then preload only what's needed per agent:
+
+```yaml
+# Planning agent
+skills: ["api-routes"]
+
+# Implementation agent
+skills: ["api-routes", "api-errors"]
+
+# Review agent
+skills: ["api-auth", "api-errors"]
+```
+
+## Conditional Preloading
+
+Load different skills based on agent purpose:
+
+<CodeGroup>
+
+```yaml Frontend Agent
+---
+name: frontend-agent
+skills:
+  - "react-patterns"
+  - "css-conventions"
+  - "component-structure"
+---
+```
+
+```yaml Backend Agent
+---
+name: backend-agent
+skills:
+  - "api-conventions"
+  - "database-patterns"
+  - "error-handling"
+---
+```
+
+```yaml Full-Stack Agent
+---
+name: full-stack-agent
+skills:
+  - "project-patterns"      # Both frontend and backend
+  - "testing-strategy"       # Both
+  - "deployment-guide"       # Both
+---
+```
+
+</CodeGroup>
+
+## Verification
+
+Check what skills are preloaded:
+
+```bash
+# View agent configuration
+cat .claude/agents/orchestrator.md | grep -A 5 'skills:'
+
+# Check skill exists
+ls .claude/skills/pro-workflow/SKILL.md
+
+# Estimate skill size
+wc -w .claude/skills/pro-workflow/SKILL.md
+# Rough token estimate: word_count * 1.3
+
+# Total preloaded size
+for skill in pro-workflow api-conventions; do
+  echo -n "$skill: "
+  wc -w .claude/skills/$skill/SKILL.md | awk '{print int($1 * 1.3) " tokens"}'
+done
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Limit Per Agent" icon="list-ol">
+    3-5 skills max. More than that bloats context.
+  </Card>
+  <Card title="Load What's Needed" icon="filter">
+    Only preload skills the agent will actually use.
+  </Card>
+  <Card title="Keep Skills Small" icon="compress">
+    Target &lt;1000 tokens per skill. Split large skills.
+  </Card>
+  <Card title="Examples Required" icon="code">
+    Every pattern needs a code example. Prose alone isn't enough.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Skill Frontmatter" icon="heading" href="/api/skills/frontmatter">
+    Configure skill metadata
+  </Card>
+  <Card title="Agent Skills" icon="robot" href="/api/agents/skills">
+    Configure agent skill preloading
+  </Card>
+  <Card title="Skill Discovery" icon="magnifying-glass" href="/api/skills/discovery">
+    How skills are found and loaded
+  </Card>
+  <Card title="Creating Skills" icon="plus" href="/guides/skills/creating">
+    Build custom skills
+  </Card>
+</CardGroup>

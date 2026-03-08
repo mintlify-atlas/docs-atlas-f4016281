@@ -1,0 +1,503 @@
+---
+title: 'Wrap-Up Ritual'
+description: 'End-of-session ritual that audits changes, runs quality checks, captures learnings, and produces a session summary'
+icon: 'check-circle'
+---
+
+## Overview
+
+Wrap-Up is an end-of-session ritual that ensures you leave your codebase in a clean state and capture learnings for future sessions. It's different from session-handoff — Wrap-Up is a checklist for *you*, while handoff is a document for the *next session*.
+
+## Trigger
+
+Use when:
+- Ending a coding session
+- Saying "wrap up", "done for now", "finish coding"
+- Before closing the editor
+- After completing a feature or task
+
+<CodeGroup>
+```bash Claude Code
+/wrap-up
+/pro-workflow:wrap-up
+```
+
+```bash Cursor
+# Skill is available automatically
+"wrap up this session"
+```
+</CodeGroup>
+
+## Workflow
+
+The Wrap-Up ritual follows a 5-step checklist:
+
+<Steps>
+  <Step title="Changes Audit">
+    What files were modified? Anything uncommitted? TODOs left in code?
+    
+    ```bash
+    git status
+    git diff --stat
+    ```
+    
+    Output:
+    - List of modified files
+    - Uncommitted changes highlighted
+    - Any new untracked files
+  </Step>
+  
+  <Step title="Quality Check">
+    Run lint, typecheck, and tests. All passing? Any warnings?
+    
+    ```bash
+    npm run lint 2>&1 | head -20
+    npm run typecheck 2>&1 | head -20
+    npm test -- --changed --passWithNoTests
+    ```
+    
+    Output:
+    - Pass/fail status for each gate
+    - Error count and first few errors if any
+    - Warning count
+  </Step>
+  
+  <Step title="Learning Capture">
+    What mistakes were made? What patterns worked well?
+    
+    Format as `[LEARN] Category: Rule`
+    
+    Categories:
+    - Navigation, Editing, Testing, Git, Quality, Context, Architecture, Performance
+  </Step>
+  
+  <Step title="Next Session Context">
+    What's the next logical task? Any blockers? Context to preserve?
+    
+    Output:
+    - Next task description
+    - Known blockers or dependencies
+    - Files to review next session
+  </Step>
+  
+  <Step title="Summary">
+    One paragraph: what was accomplished, current state, what's next.
+    
+    Output:
+    - Concise session summary
+    - State of the codebase
+    - Confidence level (high/medium/low)
+  </Step>
+</Steps>
+
+<Warning>
+**Do not skip any checklist step.** Each step serves a purpose for clean session endings.
+</Warning>
+
+## Learning Categories
+
+Wrap-Up captures learnings in these categories:
+
+<AccordionGroup>
+  <Accordion title="Navigation" icon="compass">
+    File paths, finding code, wrong file edited
+    
+    Examples:
+    - `[LEARN] Navigation: Confirm full path when multiple files share a name`
+    - `[LEARN] Navigation: Auth logic is in src/middleware/ not src/auth/`
+  </Accordion>
+  
+  <Accordion title="Editing" icon="pen-to-square">
+    Code changes, patterns, wrong approach
+    
+    Examples:
+    - `[LEARN] Editing: Use early returns instead of nested if statements`
+    - `[LEARN] Editing: Always use async/await, not .then() chains`
+  </Accordion>
+  
+  <Accordion title="Testing" icon="vial">
+    Test approaches, coverage gaps, flaky tests
+    
+    Examples:
+    - `[LEARN] Testing: Mock external APIs in auth tests to prevent flakiness`
+    - `[LEARN] Testing: Run tests before commit, not after`
+  </Accordion>
+  
+  <Accordion title="Git" icon="code-branch">
+    Commits, branches, merge issues
+    
+    Examples:
+    - `[LEARN] Git: Always pull before creating new feature branches`
+    - `[LEARN] Git: Use conventional commit format for consistency`
+  </Accordion>
+  
+  <Accordion title="Quality" icon="shield-check">
+    Lint, types, style violations
+    
+    Examples:
+    - `[LEARN] Quality: Run typecheck after adding new interfaces`
+    - `[LEARN] Quality: Fix lint warnings immediately, don't accumulate`
+  </Accordion>
+  
+  <Accordion title="Context" icon="messages">
+    When to clarify, missing requirements
+    
+    Examples:
+    - `[LEARN] Context: Ask about error handling strategy before implementing`
+    - `[LEARN] Context: Clarify scope before touching >5 files`
+  </Accordion>
+  
+  <Accordion title="Architecture" icon="building">
+    Design decisions, wrong abstractions
+    
+    Examples:
+    - `[LEARN] Architecture: Keep business logic out of React components`
+    - `[LEARN] Architecture: Prefer composition over inheritance`
+  </Accordion>
+  
+  <Accordion title="Performance" icon="gauge-high">
+    Optimization, O(n^2) loops, memory
+    
+    Examples:
+    - `[LEARN] Performance: Use indexes for frequently queried fields`
+    - `[LEARN] Performance: Debounce search input, don't query on every keystroke`
+  </Accordion>
+</AccordionGroup>
+
+## Guardrails
+
+<CardGroup cols={2}>
+  <Card title="No Skipping Steps" icon="ban">
+    Every checklist item must be completed. If tests are failing, flag before ending session.
+  </Card>
+  <Card title="Uncommitted Changes" icon="file-circle-question">
+    If uncommitted changes exist, ask whether to commit or stash. Never leave in ambiguous state.
+  </Card>
+  <Card title="Learning Format" icon="list-check">
+    Always use `[LEARN] Category: Rule` format. Keep rules to one line, specific and actionable.
+  </Card>
+  <Card title="Quality Gate Failures" icon="triangle-exclamation">
+    If lint/typecheck/tests fail, document why and create TODO for next session.
+  </Card>
+</CardGroup>
+
+## Output
+
+Wrap-Up provides a comprehensive session report:
+
+```text
+WRAP-UP REPORT
+==============
+
+1. CHANGES AUDIT
+   Modified (5 files):
+   M  src/api/users.ts
+   M  src/types/user.ts
+   M  tests/api/users.test.ts
+   M  src/middleware/auth.ts
+   M  package.json
+   
+   Uncommitted:
+   ⚠️  src/utils/debug.ts (new file, not tracked)
+   
+   TODOs:
+   - src/api/users.ts:42: TODO(#123): add rate limiting
+
+2. QUALITY CHECK
+   ✓ Lint: passed (0 errors, 2 warnings)
+   ✓ Typecheck: passed
+   ✓ Tests: 23 passed, 0 failed
+   
+   Warnings:
+   - src/utils/debug.ts: 'debugMode' is defined but never used
+
+3. LEARNINGS CAPTURED
+   [LEARN] Testing: Mock external APIs in auth tests to prevent flakiness
+   [LEARN] Navigation: User types are in src/types/user.ts not src/models/user.ts
+
+4. NEXT SESSION CONTEXT
+   Next task: Add rate limiting to login endpoint (#123)
+   
+   Blockers: None
+   
+   Files to review:
+   - src/middleware/auth.ts (modified authentication flow)
+   - Check if debug.ts should be committed or removed
+
+5. SESSION SUMMARY
+   Completed user profile update endpoint with PATCH /api/users/:id.
+   Added validation for email format and username immutability.
+   All tests passing. Ready to merge to main after adding rate limiting.
+   
+   State: HIGH confidence, clean codebase, clear next steps.
+
+==============
+Ready to end session?
+```
+
+## Examples
+
+### Example 1: Clean Session
+
+```bash
+User: "wrap up"
+
+Claude:
+[Runs full checklist]
+
+WRAP-UP REPORT
+==============
+
+1. CHANGES AUDIT
+   Modified (3 files):
+   M  src/components/Button.tsx
+   M  src/components/Button.test.tsx
+   M  src/styles/button.css
+   
+   ✓ All changes committed (last commit: a3f5c21)
+   ✓ No untracked files
+   ✓ No TODOs
+
+2. QUALITY CHECK
+   ✓ Lint: passed
+   ✓ Typecheck: passed
+   ✓ Tests: 15 passed
+
+3. LEARNINGS CAPTURED
+   No new learnings this session.
+
+4. NEXT SESSION CONTEXT
+   Next task: Add loading state to Button component
+   Blockers: None
+
+5. SESSION SUMMARY
+   Refactored Button component to use CSS modules. Improved
+   type safety with stricter prop types. All tests passing.
+   Ready for code review.
+   
+   State: HIGH confidence.
+
+==============
+Ready to end session?
+```
+
+### Example 2: Uncommitted Changes
+
+```bash
+User: "done for now"
+
+Claude:
+[Runs checklist]
+
+WRAP-UP REPORT
+==============
+
+1. CHANGES AUDIT
+   Modified (2 files):
+   M  src/api/webhooks.ts
+   M  tests/api/webhooks.test.ts
+   
+   ⚠️ UNCOMMITTED CHANGES
+   
+   Should I:
+   1. Commit these changes with /smart-commit
+   2. Stash for later with `git stash save "webhook retry logic"`
+   3. Continue wrap-up without committing
+
+[After decision...]
+
+2. QUALITY CHECK
+   ✓ Lint: passed
+   ✓ Typecheck: passed
+   ✗ Tests: 12 passed, 1 failed
+   
+   Failure:
+   tests/api/webhooks.test.ts:45
+     Expected status 200 but got 500
+   
+   ⚠️ Failing test should be fixed or documented as known issue.
+
+3. LEARNINGS CAPTURED
+   [LEARN] Testing: Test edge cases before calling wrap-up
+
+4. NEXT SESSION CONTEXT
+   Next task: Fix failing webhook test (#45)
+   
+   Blockers: Test failure needs investigation
+
+5. SESSION SUMMARY
+   Added webhook retry logic with exponential backoff.
+   Implementation complete but one test failing. Need to
+   investigate why webhook returns 500 in test environment.
+   
+   State: MEDIUM confidence, test failure needs attention.
+
+==============
+Ready to end session? (Recommended: fix test first)
+```
+
+### Example 3: Quality Gate Failure
+
+```bash
+User: "wrap up"
+
+Claude:
+[Runs checklist]
+
+WRAP-UP REPORT
+==============
+
+1. CHANGES AUDIT
+   Modified (1 file):
+   M  src/utils/parser.ts
+   
+   ✓ All changes committed
+
+2. QUALITY CHECK
+   ✗ Lint: 3 errors
+   
+   src/utils/parser.ts:12:5
+     Missing semicolon
+   
+   src/utils/parser.ts:18:3
+     'parseJson' is defined but never used
+   
+   src/utils/parser.ts:25:10
+     Unexpected console.log
+   
+   ⚠️ Typecheck: not run (lint must pass first)
+   ⚠️ Tests: not run (lint must pass first)
+   
+   Quality gates failed. Should I:
+   1. Fix the lint errors now
+   2. Create TODO for next session
+   3. Amend the last commit after fixing
+
+[After decision...]
+
+3. LEARNINGS CAPTURED
+   [LEARN] Quality: Run lint before committing, not after
+   [LEARN] Editing: Remove debug console.log statements before commit
+
+4. NEXT SESSION CONTEXT
+   Next task: Fix lint errors in parser.ts
+   Blockers: Lint errors must be fixed before continuing
+
+5. SESSION SUMMARY
+   Added JSON parser utility. Committed but lint errors
+   introduced. Need to fix linting before moving forward.
+   
+   State: LOW confidence, technical debt introduced.
+
+==============
+⚠️ Session ending with quality gate failures.
+Recommended: Fix lint errors first.
+
+Continue anyway?
+```
+
+## Integration with Pro Workflow
+
+<CardGroup cols={2}>
+  <Card title="Smart Commit" icon="code-commit" href="/skills/smart-commit">
+    Wrap-Up calls Smart Commit if uncommitted changes exist
+  </Card>
+  <Card title="Session Handoff" icon="hand-holding-hand" href="/skills/session-handoff">
+    Run handoff after wrap-up to generate resume context
+  </Card>
+  <Card title="Learn Rule" icon="graduation-cap" href="/skills/learn-rule">
+    Learnings captured during wrap-up use learn-rule format
+  </Card>
+  <Card title="Insights" icon="chart-line" href="/skills/insights">
+    Wrap-Up data feeds into session analytics
+  </Card>
+</CardGroup>
+
+## Configuration
+
+### Custom Quality Commands
+
+Override default commands in CLAUDE.md:
+
+```markdown
+## Wrap-Up Quality Gates
+
+Run these before ending session:
+- Lint: `npm run lint -- --max-warnings 0`
+- Types: `tsc --noEmit`
+- Tests: `npm test -- --coverage`
+- Security: `npm audit`
+```
+
+### Skip Specific Checks
+
+Temporarily skip checks (use sparingly):
+
+```bash
+# Skip tests (if blocked by external service)
+WRAP_UP_SKIP_TESTS=true /wrap-up
+
+# Skip lint (not recommended)
+WRAP_UP_SKIP_LINT=true /wrap-up
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Run Wrap-Up Every Session" icon="calendar-check">
+    Make it a habit. Even 5-minute sessions benefit from wrap-up discipline.
+  </Accordion>
+  
+  <Accordion title="Capture Mistakes Immediately" icon="bolt">
+    Fresh context makes better learnings. Don't wait until later.
+  </Accordion>
+  
+  <Accordion title="Leave Clean State" icon="sparkles">
+    All changes committed, tests passing, no surprises for next session.
+  </Accordion>
+  
+  <Accordion title="Document Blockers" icon="road-barrier">
+    If ending with issues, clearly document what's blocking and why.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### Wrap-Up Takes Too Long
+
+```bash
+# Run only fast quality gates
+npm run lint -- --quiet
+npm test -- --onlyChanged
+```
+
+### No Learnings to Capture
+
+That's fine! Not every session has mistakes. But consider:
+- What worked well that should be repeated?
+- What was faster than expected?
+- What was slower and why?
+
+### Quality Gates Always Failing
+
+If quality gates consistently fail:
+1. Fix technical debt before new features
+2. Add pre-commit hooks to catch earlier
+3. Adjust thresholds if too strict
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Try Session Handoff" icon="hand-holding-hand" href="/skills/session-handoff">
+    Generate resume context for smooth session continuity
+  </Card>
+  <Card title="Master Learn Rule" icon="graduation-cap" href="/skills/learn-rule">
+    Turn corrections into permanent memory
+  </Card>
+  <Card title="View Insights" icon="chart-line" href="/skills/insights">
+    Analyze patterns from wrap-up data
+  </Card>
+  <Card title="Explore All Skills" icon="puzzle-piece" href="/skills/overview">
+    See the complete skill system
+  </Card>
+</CardGroup>

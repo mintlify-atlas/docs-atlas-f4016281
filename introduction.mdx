@@ -1,0 +1,144 @@
+---
+title: Introduction
+description: Battle-tested AI coding workflow framework with orchestration patterns, agents, hooks, and self-correcting memory
+---
+
+# Pro Workflow
+
+**Complete AI coding workflow system from production use.** Orchestration patterns, 18 hook events, 5 agents, 7 reference guides, and cross-agent support.
+
+<Note>
+Works with **Claude Code**, **Cursor**, and **32+ agents** via SkillKit.
+</Note>
+
+## The Core Insight
+
+> "80% of my code is written by AI, 20% is spent reviewing and correcting it." — Andrej Karpathy
+
+Pro Workflow optimizes for that ratio. Every pattern reduces correction cycles.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Self-Correcting Memory" icon="brain" href="/concepts/self-correction-loop">
+    SQLite-backed learning system with FTS5 search. Claude learns from your corrections automatically.
+  </Card>
+  <Card title="Orchestration Patterns" icon="diagram-project" href="/concepts/orchestration-patterns">
+    Command > Agent > Skill architecture for multi-phase development workflows.
+  </Card>
+  <Card title="18 Hook Events" icon="webhook" href="/hooks/overview">
+    Lifecycle management from SessionStart to SubagentStop. Track everything.
+  </Card>
+  <Card title="5 Specialized Agents" icon="robot" href="/agents/overview">
+    Planner, reviewer, scout, orchestrator, and debugger. Each with constrained tools.
+  </Card>
+  <Card title="11 Modular Skills" icon="puzzle-piece" href="/skills/overview">
+    From smart-commit to context-optimizer. Load what you need.
+  </Card>
+  <Card title="Multi-Phase Development" icon="layer-group" href="/concepts/multi-phase-development">
+    Research > Plan > Implement > Review with validation gates.
+  </Card>
+  <Card title="Parallel Worktrees" icon="code-branch" href="/concepts/parallel-worktrees">
+    Zero dead time. Native worktree support for concurrent sessions.
+  </Card>
+  <Card title="Cross-Agent Support" icon="share-nodes" href="/guides/cross-agent-workflows">
+    Works across Claude Code, Cursor, and 32+ agents via SkillKit translation.
+  </Card>
+</CardGroup>
+
+## What's New in v2.0
+
+- **Orchestration Patterns** — Command > Agent > Skill architecture
+- **5 Agents** — planner, reviewer, scout, orchestrator (RPI workflow), debugger
+- **18 Hook Events** — Added SubagentStart/Stop, TaskCompleted, PermissionRequest, TeammateIdle, PostToolUseFailure
+- **7 Reference Guides** — Settings, CLI cheatsheet, orchestration patterns, context loading, cross-agent workflows, new features, daily habits
+- **Context Optimizer** — Token management and context budget planning skill
+- **Production Settings** — Full settings.example.json with permissions, spinner, output style
+- **Curated MCP Config** — Battle-tested server recommendations with scope guidance
+- **/develop Command** — Research > Plan > Implement > Review & Commit with validation gates
+- **/doctor Command** — Health check for your pro-workflow setup
+
+## Architecture Overview
+
+Pro Workflow uses a three-layer orchestration pattern:
+
+```text
+Command (entry point, user-facing)
+  └── Agent (execution, constrained tools)
+        └── Skill (domain knowledge, preloaded)
+```
+
+Each layer has a single responsibility:
+- **Commands** handle user interaction and parameter collection
+- **Agents** execute workflows with constrained tool access
+- **Skills** provide domain-specific knowledge and procedures
+
+## Quick Start
+
+<Steps>
+  <Step title="Install the Plugin">
+    <Tabs>
+      <Tab title="Cursor">
+        ```bash
+        /add-plugin pro-workflow
+        ```
+      </Tab>
+      <Tab title="Claude Code">
+        ```bash
+        /plugin marketplace add rohitg00/pro-workflow
+        /plugin install pro-workflow@pro-workflow
+        ```
+      </Tab>
+      <Tab title="Manual">
+        ```bash
+        git clone https://github.com/rohitg00/pro-workflow.git /tmp/pw
+        cp -r /tmp/pw/templates/split-claude-md/* ./.claude/
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+  
+  <Step title="Try Your First Command">
+    Run a multi-phase feature development:
+    ```bash
+    /develop add user authentication
+    ```
+    
+    Or check your setup:
+    ```bash
+    /doctor
+    ```
+  </Step>
+  
+  <Step title="Explore the Patterns">
+    Learn the core workflows:
+    - [Self-Correction Loop](/concepts/self-correction-loop) — Compound improvements over time
+    - [Multi-Phase Development](/concepts/multi-phase-development) — Research before implementing
+    - [Parallel Worktrees](/concepts/parallel-worktrees) — Zero dead time between sessions
+  </Step>
+</Steps>
+
+## Philosophy
+
+1. **Compound improvements** — Small corrections lead to big gains over time
+2. **Trust but verify** — Let AI work, review at checkpoints
+3. **Zero dead time** — Parallel sessions keep momentum
+4. **Memory is precious** — Both yours and Claude's
+5. **Orchestrate, don't micromanage** — Wire patterns together, let agents execute
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Get up and running in 30 seconds
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Detailed installation for all environments
+  </Card>
+  <Card title="Core Concepts" icon="book" href="/concepts/architecture">
+    Understand the framework architecture
+  </Card>
+  <Card title="Commands Reference" icon="terminal" href="/commands/overview">
+    Explore all available commands
+  </Card>
+</CardGroup>

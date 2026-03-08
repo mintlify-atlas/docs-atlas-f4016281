@@ -1,0 +1,472 @@
+---
+title: Parallel Worktrees
+description: Zero dead time—work on multiple branches simultaneously with git worktrees
+---
+
+Parallel worktrees enable you to work on multiple branches simultaneously without switching context. While one session runs tests or builds, start working on something else in a separate worktree.
+
+## The Problem
+
+Traditional git workflow has dead time:
+
+```text
+[Main Branch]
+  ├─ Make changes
+  ├─ Run tests (2 minutes) ⏳ ← You wait
+  ├─ Tests fail
+  ├─ Fix issue
+  ├─ Run tests again (2 minutes) ⏳ ← You wait again
+  └─ Finally done
+
+Total time: Active work (10 min) + Dead time (4 min) = 14 minutes
+```
+
+## The Solution: Git Worktrees
+
+Worktrees let you check out multiple branches simultaneously:
+
+```text
+~/project          (main branch)
+~/project-feat     (feature branch) ← Separate directory, same repo
+~/project-fix      (bugfix branch)  ← Another separate directory
+```
+
+Each worktree is a full working copy. Changes are isolated. No more `git stash` or context switching.
+
+## Quick Start
+
+<Tabs>
+  <Tab title="Claude Code">
+    Claude Code has built-in worktree support:
+    
+    ```bash
+    claude --worktree    # or claude -w
+    ```
+    
+    This automatically:
+    - Creates an isolated worktree
+    - Generates a unique branch name
+    - Cleans up when session ends
+  </Tab>
+  
+  <Tab title="Manual Setup">
+    For Cursor, VS Code, or any editor:
+    
+    ```bash
+    # Create worktree for feature branch
+    git worktree add ../project-feat feature-branch
+    
+    # Create worktree for new branch
+    git worktree add ../project-exp -b experiment
+    
+    # List all worktrees
+    git worktree list
+    ```
+    
+    Then open the new directory in a separate editor window.
+  </Tab>
+</Tabs>
+
+## Zero Dead Time Workflow
+
+<Steps>
+  <Step title="Start tests in Terminal 1">
+    ```bash
+    cd ~/project
+    npm test  # 2 minute test run
+    ```
+  </Step>
+  
+  <Step title="Immediately switch to Terminal 2">
+    ```bash
+    git worktree add ../project-feat feature/add-webhooks
+    cd ../project-feat
+    claude  # or open in Cursor
+    ```
+  </Step>
+  
+  <Step title="Work on feature while tests run">
+    No context switch. Main branch tests running, feature branch development active.
+  </Step>
+  
+  <Step title="Tests finish in Terminal 1">
+    Review results. If failed, fix in Terminal 1.
+  </Step>
+  
+  <Step title="Continue feature in Terminal 2">
+    No interruption. Both workstreams progress.
+  </Step>
+</Steps>
+
+**Result:** Zero wasted time. Continuous progress.
+
+## Common Workflows
+
+### Review While Developing
+
+```bash
+# Terminal 1: Review PR
+git worktree add ../project-review feature/user-auth
+cd ../project-review
+claude  # Review code, run tests
+
+# Terminal 2: Continue development
+cd ~/project
+claude  # Keep working on current feature
+```
+
+No context switching. Review doesn't block development.
+
+### Explore Multiple Approaches
+
+```bash
+# Try 3 approaches simultaneously
+git worktree add ../project-graphql -b experiment/graphql
+git worktree add ../project-rest -b experiment/rest  
+git worktree add ../project-grpc -b experiment/grpc
+
+# Open each in separate terminal/editor
+# Let Claude explore each approach in parallel
+# Compare results after 30 minutes
+```
+
+### Hotfix While Building Feature
+
+```bash
+# Terminal 1: Feature development (ongoing)
+cd ~/project
+claude  # Building complex feature
+
+# Bug report comes in
+# Terminal 2: Hotfix
+git worktree add ../project-hotfix -b hotfix/auth-bug
+cd ../project-hotfix
+claude  # Fix bug, test, commit, push
+cd ~/project-hotfix
+git worktree remove ../project-hotfix
+
+# Terminal 1: Feature continues uninterrupted
+```
+
+## Worktree Commands
+
+<CodeGroup>
+```bash List Worktrees
+git worktree list
+
+# Output:
+# /home/user/project         abc123 [main]
+# /home/user/project-feat    def456 [feature/webhooks]
+# /home/user/project-fix     ghi789 [fix/auth-bug]
+```
+
+```bash Create Worktree
+# From existing branch
+git worktree add ../project-feat feature-branch
+
+# Create new branch
+git worktree add ../project-exp -b experiment
+
+# From specific commit
+git worktree add ../project-old abc123
+```
+
+```bash Remove Worktree
+# Remove specific worktree
+git worktree remove ../project-feat
+
+# Remove and delete branch
+git worktree remove ../project-feat
+git branch -d feature-branch
+
+# Clean up stale references
+git worktree prune
+```
+
+```bash Move Worktree
+# Move to new location
+git worktree move ../project-feat ../new-location/project-feat
+```
+</CodeGroup>
+
+## Claude Code Features
+
+Claude Code has special worktree integration:
+
+### Auto-Created Worktrees
+
+```bash
+claude --worktree  # or -w
+```
+
+- Creates isolated worktree automatically
+- Generates unique branch name: `worktree-{timestamp}`
+- Cleans up when session ends
+
+### Subagent Worktree Isolation
+
+Agents can run in isolated worktrees:
+
+```yaml
+---
+name: researcher
+description: Explore codebase in isolation
+tools: ["Read", "Glob", "Grep"]
+background: true
+isolation: worktree  # ← Runs in separate worktree
+---
+```
+
+**Benefits:**
+- Agent can't accidentally modify main working tree
+- Experiments are isolated
+- Easy to discard if research is wrong
+
+### Background Agent Management
+
+<Tabs>
+  <Tab title="Send to Background">
+    `Ctrl+B` — Send current task to background
+    
+    Agent continues in background worktree while you work on main branch.
+  </Tab>
+  
+  <Tab title="Kill Background Agents">
+    `Ctrl+F` — Kill all background agents (two-press confirmation)
+    
+    Cleans up background worktrees.
+  </Tab>
+</Tabs>
+
+## When to Use Worktrees
+
+| Scenario | Use Worktree? | Why |
+|----------|---------------|-----|
+| Tests running (2+ min) | ✓ Yes | Start new work while waiting |
+| Long build | ✓ Yes | Don't block on compilation |
+| Exploring approaches | ✓ Yes | Compare 2-3 simultaneously |
+| Review + development | ✓ Yes | Review doesn't block dev |
+| Hotfix during feature | ✓ Yes | Fix without losing feature state |
+| Simple bug fix | ✗ No | Overhead not worth it |
+| Quick experiment | ✗ No | Use git stash instead |
+
+## Guardrails
+
+<Warning>
+  Each worktree is a full working copy. Don't edit the same files in multiple worktrees simultaneously.
+</Warning>
+
+### Best Practices
+
+<Check>Verify changes are committed before removing worktree</Check>
+<Check>Use descriptive names for worktree directories</Check>
+<Check>Clean up worktrees when done (`git worktree prune`)</Check>
+<Check>Keep worktrees outside main project directory</Check>
+
+### Common Pitfalls
+
+<X>Removing worktree with uncommitted changes (data loss)</X>
+<X>Editing same files in multiple worktrees (merge conflicts)</X>
+<X>Forgetting to clean up old worktrees (disk space waste)</X>
+<X>Creating worktrees inside project directory (confusing)</X>
+
+## Safety Checks
+
+Before removing a worktree:
+
+```bash
+# Check for uncommitted changes
+git -C ../project-feat status
+
+# If clean:
+git worktree remove ../project-feat
+
+# If uncommitted:
+cd ../project-feat
+git add .
+git commit -m "Save work"
+cd -
+git worktree remove ../project-feat
+```
+
+## Directory Structure
+
+Recommended layout:
+
+```text
+~/code/
+├── myproject/              (main worktree)
+├── myproject-feat/         (feature worktree)
+├── myproject-fix/          (hotfix worktree)
+└── myproject-review/       (review worktree)
+```
+
+**Why outside main directory?**
+- Clearer separation
+- Editor doesn't index multiple copies
+- Less confusion about which worktree you're in
+
+## Editor Integration
+
+<Tabs>
+  <Tab title="VS Code / Cursor">
+    Open each worktree in a separate window:
+    
+    ```bash
+    code ~/myproject              # Window 1: main
+    code ~/myproject-feat         # Window 2: feature
+    code ~/myproject-review       # Window 3: review
+    ```
+    
+    Each window has its own:
+    - Terminal
+    - Git state
+    - File watcher
+  </Tab>
+  
+  <Tab title="Terminal Only">
+    Use tmux or split panes:
+    
+    ```bash
+    # tmux session with 3 panes
+    tmux new-session -s dev
+    
+    # Pane 1: main branch
+    cd ~/myproject
+    
+    # Pane 2: feature branch (Ctrl+B, ")
+    cd ~/myproject-feat
+    
+    # Pane 3: review (Ctrl+B, ")
+    cd ~/myproject-review
+    ```
+  </Tab>
+</Tabs>
+
+## Agent Teams with Worktrees
+
+Combine agent teams with worktrees for maximum parallelism:
+
+```bash
+# Enable agent teams
+export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+
+# Each teammate works in isolated worktree
+claude
+```
+
+**Setup:**
+1. Lead agent coordinates from main worktree
+2. Teammate 1: Frontend changes in worktree 1
+3. Teammate 2: Backend changes in worktree 2
+4. Teammate 3: Tests in worktree 3
+
+**Benefits:**
+- Complete isolation
+- No merge conflicts during development
+- Easy to discard failed experiments
+- Merge only successful branches
+
+## Performance Considerations
+
+**Disk Space:**
+- Each worktree is a full checkout (~same size as main repo)
+- `.git` directory is shared (not duplicated)
+- 3 worktrees ≈ 3x working tree size, 1x .git size
+
+**Build Artifacts:**
+- Each worktree has its own `node_modules`, `target`, etc.
+- Use hard links if possible: `npm ci --prefer-offline`
+- Or share build cache between worktrees
+
+**Example:**
+```bash
+# Main repo: 100MB working tree + 50MB .git
+# 3 worktrees: (100MB × 3) + 50MB = 350MB total
+```
+
+## Cleanup
+
+Regular maintenance:
+
+```bash
+# List all worktrees
+git worktree list
+
+# Remove unused worktrees
+git worktree remove ../project-old
+
+# Clean up stale references
+git worktree prune
+
+# Remove deleted branches
+git fetch --prune
+```
+
+<Tip>
+  Add to your wrap-up ritual: Check for forgotten worktrees and clean them up.
+</Tip>
+
+## Real-World Examples
+
+<AccordionGroup>
+  <Accordion title="Example: Zero Dead Time Development">
+    ```bash
+    # 9:00 AM - Start tests in main branch
+    cd ~/project
+    npm test  # 5 minute test suite
+    
+    # 9:00 AM - Immediately start feature work
+    git worktree add ../project-webhooks -b feature/webhooks
+    cd ../project-webhooks
+    claude
+    # > "Build webhook support"
+    
+    # 9:05 AM - Tests finish in main branch
+    # (Terminal 1 shows results)
+    
+    # 9:05 AM - Feature work continues uninterrupted
+    # (Terminal 2 still working on webhooks)
+    
+    # Result: 5 minutes of parallel progress instead of 5 minutes waiting
+    ```
+  </Accordion>
+  
+  <Accordion title="Example: Comparing Approaches">
+    ```bash
+    # Try 3 different approaches to same feature
+    git worktree add ../approach-1 -b exp/graphql
+    git worktree add ../approach-2 -b exp/rest
+    git worktree add ../approach-3 -b exp/grpc
+    
+    # Terminal 1: GraphQL approach
+    cd ../approach-1
+    claude "implement GraphQL API"
+    
+    # Terminal 2: REST approach  
+    cd ../approach-2
+    claude "implement REST API"
+    
+    # Terminal 3: gRPC approach
+    cd ../approach-3
+    claude "implement gRPC API"
+    
+    # 1 hour later: compare all three
+    # Keep the best one, delete the other worktrees
+    git worktree remove ../approach-1
+    git worktree remove ../approach-3
+    git branch -d exp/graphql exp/grpc
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Multi-Phase Development" icon="timeline" href="/concepts/multi-phase-development">
+    Use worktrees for parallel research phases
+  </Card>
+  <Card title="Orchestration Patterns" icon="diagram-project" href="/concepts/orchestration-patterns">
+    Combine with agent teams for maximum parallelism
+  </Card>
+</CardGroup>

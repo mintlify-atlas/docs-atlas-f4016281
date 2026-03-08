@@ -1,0 +1,448 @@
+---
+title: 80/20 Review Pattern
+description: Batch reviews at strategic checkpoints instead of reviewing every change
+---
+
+> "80% of my code is written by AI, 20% is spent reviewing and correcting it." — Andrej Karpathy
+
+The 80/20 review pattern optimizes this ratio. Instead of reviewing every edit, batch reviews at strategic checkpoints. Between checkpoints, trust the AI and move fast.
+
+## The Problem with Constant Review
+
+Reviewing every change kills momentum:
+
+```text
+Edit file 1 → Review → Edit file 2 → Review → Edit file 3 → Review
+  ↑           ↑         ↑           ↑         ↑           ↑
+  2 min       3 min     2 min       3 min     2 min       3 min
+
+Total: 15 minutes (only 6 minutes of actual progress)
+```
+
+**Problems:**
+- Context switching overhead
+- Interrupts AI's flow
+- Reviews often find nothing wrong
+- Slows down iteration speed
+
+## The 80/20 Solution
+
+Batch reviews at checkpoints:
+
+```text
+Edit 5 files → Checkpoint Review → Edit 5 more → Checkpoint Review
+  ↑              ↑                   ↑              ↑
+  10 min         5 min               10 min         5 min
+
+Total: 30 minutes for 10 files (vs 45 minutes with constant review)
+```
+
+**Benefits:**
+- 33% faster overall
+- Better context (see changes together)
+- AI maintains flow between reviews
+- Reviews are more thorough (not rushed)
+
+## Review Checkpoints
+
+Review at these strategic points:
+
+<Steps>
+  <Step title="After Plan Approval">
+    Review the plan before any code is written
+  </Step>
+  <Step title="Every 5 File Edits">
+    Checkpoint review during implementation
+  </Step>
+  <Step title="Before Destructive Operations">
+    Review before git operations, deletions, or schema changes
+  </Step>
+  <Step title="At Wrap-Up">
+    Final review before ending the session
+  </Step>
+</Steps>
+
+### Checkpoint 1: After Plan Approval
+
+**When:** Before any implementation begins
+
+**What to review:**
+- Does the plan make sense?
+- Are all affected files identified?
+- Are risks and mitigations reasonable?
+- Is the approach aligned with project patterns?
+
+**Example:**
+```text
+PLAN: Add Webhook Support
+
+Files to modify: 4 files
+New files: 2 files
+Approach: Event-driven with retry logic
+Risks: High volume, circular webhooks
+
+✓ Review: Plan approved, proceed
+```
+
+<Note>
+  This is the most important review point. A bad plan leads to many corrections later.
+</Note>
+
+### Checkpoint 2: Every 5 File Edits
+
+**When:** After editing 5 files (or ~20 minutes of work)
+
+**What to review:**
+- Are changes following the plan?
+- Any obvious bugs or logic errors?
+- Tests passing?
+- Ready to continue or need course correction?
+
+**Example:**
+```text
+CHECKPOINT: 5 files edited
+
+Completed:
+✓ src/models/webhook.ts - Model validation
+✓ src/api/events.ts - Event hooks
+✓ src/services/delivery.ts - HTTP delivery
+✓ src/queue/webhook-queue.ts - Retry logic
+✓ migrations/001-webhooks.sql - Schema
+
+Tests: 18/18 passing
+Typecheck: Clean
+
+→ Continue to next 5 files
+```
+
+### Checkpoint 3: Before Destructive Operations
+
+**When:** Before operations that are hard to undo
+
+**Destructive operations:**
+- `git commit` (review before committing)
+- `git push` (double-check before pushing)
+- File deletion (verify files should really be deleted)
+- Schema changes (migrations are hard to reverse)
+- `npm publish` (can't unpublish)
+
+**Example:**
+```text
+About to commit:
+  M src/models/webhook.ts
+  M src/api/events.ts
+  A migrations/001-webhooks.sql
+  D old-webhook-implementation.ts  ← Verify deletion
+
+Pause for review before commit.
+```
+
+### Checkpoint 4: At Wrap-Up
+
+**When:** Before ending the session
+
+**What to review:**
+- All changes across the session
+- Uncommitted work
+- TODOs or console.log statements
+- What was learned?
+- Any corrections to capture?
+
+**Use `/wrap-up` command:**
+```bash
+/wrap-up
+```
+
+See [Wrap-Up Ritual guide](/guides/wrap-up-ritual) for details.
+
+## Between Checkpoints: Trust Mode
+
+Between review checkpoints, operate in trust mode:
+
+<Check>Let AI work without interruption</Check>
+<Check>Run tests automatically after each file</Check>
+<Check>Watch for test failures (pause if tests break)</Check>
+<Check>Trust the plan and process</Check>
+
+<X>Don't review every edit</X>
+<X>Don't second-guess the approach mid-flow</X>
+<X>Don't ask "are you sure?" constantly</X>
+
+## Quality Gates
+
+Automatic quality gates run between checkpoints:
+
+<Tabs>
+  <Tab title="After Each File Edit">
+    ```bash
+    # Automatically run relevant tests
+    npm test -- path/to/changed-file.test.ts
+    ```
+    
+    Tests catch regressions immediately.
+  </Tab>
+  
+  <Tab title="Every 5 Edits (Checkpoint)">
+    ```bash
+    # Run full quality check
+    npm run lint
+    npm run typecheck  
+    npm test
+    ```
+    
+    Comprehensive validation at checkpoint.
+  </Tab>
+  
+  <Tab title="Before Commit (Checkpoint)">
+    ```bash
+    # Final validation
+    npm run lint
+    npm run typecheck
+    npm test -- --coverage
+    ```
+    
+    Ensure nothing slipped through.
+  </Tab>
+</Tabs>
+
+## Hook Integration
+
+Pro Workflow hooks enforce checkpoint reviews:
+
+**PreToolUse Hook** (tracks edit count)
+```json
+{
+  "hooks": {
+    "PreToolUse": "Track edit count. Remind at 5, 10, 15 edits."
+  }
+}
+```
+
+**PreToolUse Hook** (before git operations)
+```json
+{
+  "hooks": {
+    "PreToolUse": "Before git commit/push, remind about quality gates."
+  }
+}
+```
+
+**Stop Hook** (context-aware reminders)
+```json
+{
+  "hooks": {
+    "Stop": "If >5 edits since last checkpoint, suggest review."
+  }
+}
+```
+
+## Review Checklist
+
+What to look for at each checkpoint:
+
+<AccordionGroup>
+  <Accordion title="Logic & Correctness">
+    - [ ] Logic matches the plan
+    - [ ] Edge cases handled
+    - [ ] Error cases handled
+    - [ ] No obvious bugs
+    - [ ] Calculations and conditions correct
+  </Accordion>
+  
+  <Accordion title="Code Quality">
+    - [ ] Follows existing patterns
+    - [ ] Clear variable and function names
+    - [ ] No unnecessary duplication
+    - [ ] Comments for non-obvious logic
+    - [ ] No debug statements (console.log, debugger)
+  </Accordion>
+  
+  <Accordion title="Security">
+    - [ ] No hardcoded secrets
+    - [ ] Input validation present
+    - [ ] SQL injection prevention
+    - [ ] XSS prevention
+    - [ ] Authentication checks
+  </Accordion>
+  
+  <Accordion title="Testing">
+    - [ ] Tests passing
+    - [ ] New tests for new code
+    - [ ] Edge cases tested
+    - [ ] Error cases tested
+    - [ ] Coverage maintained or increased
+  </Accordion>
+  
+  <Accordion title="Performance">
+    - [ ] No obvious N+1 queries
+    - [ ] Large loops optimized
+    - [ ] Appropriate indexes (database)
+    - [ ] Caching where needed
+    - [ ] No memory leaks
+  </Accordion>
+</AccordionGroup>
+
+## When to Pause Mid-Flow
+
+Sometimes you need to pause before the next checkpoint:
+
+**Pause if:**
+- Tests suddenly break
+- Error messages you don't understand
+- AI asks a clarifying question
+- Approach seems wrong
+- About to make a destructive change
+
+**Don't pause for:**
+- Stylistic preferences (add to LEARNED instead)
+- Minor improvements (note for later)
+- Curiosity about implementation (trust the process)
+
+## Correction Workflow
+
+When you find an issue at a checkpoint:
+
+<Steps>
+  <Step title="Point out the issue">
+    Be specific: "The webhook retry logic doesn't handle 404s correctly"
+  </Step>
+  <Step title="Let AI propose fix">
+    AI explains what went wrong and proposes solution
+  </Step>
+  <Step title="Capture as learning">
+    ```text
+    [LEARN] Error Handling: Webhooks should not retry on 404 (permanent failure)
+    ```
+  </Step>
+  <Step title="Apply fix">
+    AI fixes the issue
+  </Step>
+  <Step title="Verify fix">
+    Run tests to confirm fix works
+  </Step>
+  <Step title="Continue">
+    Resume trust mode until next checkpoint
+  </Step>
+</Steps>
+
+## Metrics and Analytics
+
+Track your review effectiveness:
+
+```bash
+/insights
+```
+
+**Metrics to watch:**
+- **Corrections per checkpoint**: Should decrease over time
+- **Issues found**: More at early checkpoints vs late (front-load validation)
+- **Time between checkpoints**: Should be consistent (5 files or ~20 min)
+- **Tests catching issues**: High number means good test coverage
+
+## Comparison: Constant vs Checkpoint Review
+
+| Factor | Constant Review | Checkpoint Review (80/20) |
+|--------|----------------|---------------------------|
+| Speed | Slow (many interruptions) | Fast (sustained flow) |
+| Context | Lost between reviews | Preserved between checkpoints |
+| Thoroughness | Rushed, shallow | Batch review is deeper |
+| AI Flow | Interrupted | Maintained |
+| Time to completion | 40-60% longer | Baseline |
+| Corrections found | Same | Same (batched) |
+
+## Best Practices
+
+### Do
+
+<Check>Review the plan thoroughly before implementation</Check>
+<Check>Pause every 5 file edits for checkpoint review</Check>
+<Check>Run quality gates automatically</Check>
+<Check>Trust the process between checkpoints</Check>
+<Check>Capture corrections as learnings</Check>
+<Check>Use /wrap-up for final review</Check>
+
+### Don't
+
+<X>Review every single edit (kills momentum)</X>
+<X>Skip checkpoint reviews to save time (corrections cost more later)</X>
+<X>Ignore test failures between checkpoints</X>
+<X>Proceed with a bad plan (fix plan first)</X>
+<X>Skip final wrap-up review</X>
+
+## Integration with Other Patterns
+
+**Multi-Phase Development**
+- Each phase has its own review checkpoint
+- Research phase: review confidence score
+- Plan phase: review plan before implementation
+- Implement phase: review every 5 edits
+- Final phase: wrap-up review
+
+**Self-Correction Loop**
+- Corrections found at checkpoints → [LEARN] rules
+- Rules prevent same issues at future checkpoints
+- Checkpoints become faster over time
+
+**Agent Teams**
+- Each teammate reports at checkpoints
+- Lead reviews all teammate outputs together
+- Synchronization points prevent conflicts
+
+## Real-World Example
+
+<Accordion title="Example: Feature Development with Checkpoints">
+```text
+9:00 AM - Planning Phase
+  → Review: Plan approved (Checkpoint 1)
+
+9:15 AM - Implementation starts
+  → Edit: 5 files (models, services, routes)
+  → Tests: All passing
+  → Checkpoint 2: Review, all good
+
+9:35 AM - Continue implementation  
+  → Edit: 5 more files (tests, migrations, docs)
+  → Tests: All passing
+  → Checkpoint 3: Found issue with migration
+  → Fix: Update migration script
+  → Verify: Tests still passing
+
+9:55 AM - Quality gates
+  → Lint: Clean
+  → Typecheck: Clean  
+  → Tests: 45/45 passing
+  → Checkpoint 4: Ready to commit
+
+10:00 AM - Commit
+  → Review git diff (Checkpoint 5)
+  → Commit with conventional message
+  → /wrap-up (Checkpoint 6)
+
+Total: 1 hour, 10 files edited, 1 issue found and fixed
+
+Without checkpoints: Would have taken 1.5 hours with constant review
+```
+</Accordion>
+
+## Adjusting Checkpoint Frequency
+
+Tune checkpoint frequency based on complexity:
+
+| Task Complexity | Checkpoint Frequency |
+|----------------|---------------------|
+| Simple, well-understood | Every 7-10 files |
+| Moderate complexity | Every 5 files (default) |
+| High complexity, new domain | Every 3 files |
+| Critical (auth, payments) | Every 1-2 files |
+| Experimentation | Every 10+ files (trust mode) |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Self-Correction Loop" icon="arrow-rotate-left" href="/concepts/self-correction-loop">
+    Capture review findings as learnings
+  </Card>
+  <Card title="Multi-Phase Development" icon="timeline" href="/concepts/multi-phase-development">
+    Apply checkpoints in structured workflows
+  </Card>
+</CardGroup>

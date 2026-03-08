@@ -1,0 +1,415 @@
+---
+title: Skill Discovery
+description: How skills are found, loaded, and made available
+---
+
+Skill discovery is the process of finding and loading skills from the filesystem, making them available for invocation by users, agents, and commands.
+
+## Discovery Paths
+
+Skills are discovered from three locations in order of precedence:
+
+<Steps>
+  <Step title="Project Skills">
+    **Path:** `.claude/skills/*/SKILL.md`
+    
+    **Scope:** Current project only
+    
+    **Use for:** Project-specific patterns, conventions, and workflows
+    
+    Example: `.claude/skills/api-conventions/SKILL.md`
+  </Step>
+  
+  <Step title="User Skills">
+    **Path:** `~/.claude/skills/*/SKILL.md`
+    
+    **Scope:** All projects for this user
+    
+    **Use for:** Personal coding patterns, language-specific knowledge, tool configurations
+    
+    Example: `~/.claude/skills/typescript-patterns/SKILL.md`
+  </Step>
+  
+  <Step title="Plugin Skills">
+    **Path:** `~/.claude/plugins/*/skills/*/SKILL.md`
+    
+    **Scope:** Installed plugins
+    
+    **Use for:** Reusable community skills, framework-specific patterns
+    
+    Example: `~/.claude/plugins/marketplaces/pro-workflow/skills/wrap-up/SKILL.md`
+  </Step>
+</Steps>
+
+## Naming Convention
+
+<ParamField path="Directory Name" type="string" required>
+  The skill name comes from the directory name, not the file name.
+</ParamField>
+
+```text
+skills/
+├── wrap-up/
+│   └── SKILL.md        # Skill name: wrap-up
+├── api-conventions/
+│   └── SKILL.md        # Skill name: api-conventions
+└── replay-learnings/
+    └── SKILL.md        # Skill name: replay-learnings
+```
+
+<Warning>
+  The file must be named `SKILL.md` (uppercase). Other names are ignored.
+</Warning>
+
+## Precedence Rules
+
+When multiple skills have the same name:
+
+1. **Project** → Overrides user and plugin skills
+2. **User** → Overrides plugin skills
+3. **Plugin** → Lowest priority
+
+<Accordion title="Example: Overriding Plugin Skills">
+
+**Plugin skill:** `~/.claude/plugins/pro-workflow/skills/wrap-up/SKILL.md`
+
+```markdown
+---
+name: wrap-up
+description: Generic wrap-up ritual
+---
+
+Generic checklist for all projects.
+```
+
+**User skill:** `~/.claude/skills/wrap-up/SKILL.md`
+
+```markdown
+---
+name: wrap-up
+description: My custom wrap-up ritual
+---
+
+My personal wrap-up checklist with extra steps.
+```
+
+**Project skill:** `.claude/skills/wrap-up/SKILL.md`
+
+```markdown
+---
+name: wrap-up
+description: Project-specific wrap-up
+---
+
+Project-specific checklist with team conventions.
+```
+
+**Result:** When you run `/wrap-up`, the project skill is used.
+
+</Accordion>
+
+## Discovery Process
+
+<Steps>
+  <Step title="Scan Directories">
+    Claude Code scans all skill directories at startup:
+    
+    ```bash
+    find .claude/skills -name 'SKILL.md'
+    find ~/.claude/skills -name 'SKILL.md'
+    find ~/.claude/plugins/*/skills -name 'SKILL.md'
+    ```
+  </Step>
+  
+  <Step title="Parse Frontmatter">
+    For each `SKILL.md`, parse YAML frontmatter:
+    
+    ```yaml
+    ---
+    name: wrap-up
+    description: End-of-session ritual
+    user-invocable: true
+    ---
+    ```
+  </Step>
+  
+  <Step title="Register Skills">
+    Skills are registered by name with metadata:
+    
+    ```json
+    {
+      "wrap-up": {
+        "path": ".claude/skills/wrap-up/SKILL.md",
+        "description": "End-of-session ritual",
+        "user-invocable": true,
+        "source": "project"
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Make Available">
+    Skills are available for:
+    - User invocation: `/wrap-up`
+    - Agent preloading: `skills: ["wrap-up"]`
+    - Model invocation: Claude can call skills when relevant
+  </Step>
+</Steps>
+
+## Discovery Filters
+
+### User-Invocable
+
+Only skills with `user-invocable: true` appear in the `/` menu:
+
+```yaml
+---
+name: wrap-up
+user-invocable: true  # Shows in / menu
+---
+```
+
+```yaml
+---
+name: internal-helper
+user-invocable: false  # Hidden from / menu
+---
+```
+
+### Model Invocation
+
+Skills with `disable-model-invocation: true` can only be invoked by users:
+
+```yaml
+---
+name: dangerous-operation
+disable-model-invocation: true  # Claude cannot auto-invoke
+---
+```
+
+## Verification
+
+Check which skills are discovered:
+
+<CodeGroup>
+
+```bash List All Skills
+# Project skills
+find .claude/skills -name 'SKILL.md' -exec dirname {} \; | xargs basename
+
+# User skills
+find ~/.claude/skills -name 'SKILL.md' -exec dirname {} \; | xargs basename
+
+# Plugin skills
+find ~/.claude/plugins -name 'SKILL.md' -exec dirname {} \; | xargs basename
+```
+
+```bash Check Specific Skill
+# Find all instances of a skill
+find . ~/.claude ~/.claude/plugins -path '*/skills/wrap-up/SKILL.md' 2>/dev/null
+```
+
+```bash Validate Frontmatter
+# Check skill name matches directory
+for skill in .claude/skills/*/SKILL.md; do
+  dir=$(basename $(dirname $skill))
+  name=$(grep 'name:' $skill | head -1 | awk '{print $2}')
+  if [ "$dir" != "$name" ]; then
+    echo "Mismatch: $dir vs $name"
+  fi
+done
+```
+
+</CodeGroup>
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Skill not found">
+    **Problem:** `/my-skill` returns "Skill not found"
+    
+    **Solutions:**
+    1. Check file is named `SKILL.md` (case-sensitive)
+    2. Check directory structure: `skills/my-skill/SKILL.md`
+    3. Verify frontmatter has `name: my-skill`
+    4. Restart Claude Code to re-scan skills
+    
+    ```bash
+    # Verify structure
+    ls -la .claude/skills/my-skill/SKILL.md
+    
+    # Check frontmatter
+    head -5 .claude/skills/my-skill/SKILL.md
+    ```
+  </Accordion>
+  
+  <Accordion title="Wrong skill loaded">
+    **Problem:** Modified skill but old version still runs
+    
+    **Solutions:**
+    1. Check precedence: project > user > plugin
+    2. Find all instances:
+       ```bash
+       find . ~/.claude ~/.claude/plugins -path '*/skills/my-skill/SKILL.md'
+       ```
+    3. Remove or rename conflicting skills
+    4. Restart Claude Code
+  </Accordion>
+  
+  <Accordion title="Skill not in / menu">
+    **Problem:** Skill exists but doesn't appear in `/` menu
+    
+    **Solutions:**
+    1. Check `user-invocable: true` in frontmatter
+    2. Verify no YAML syntax errors
+    3. Restart Claude Code
+    
+    ```bash
+    # Validate YAML
+    yq eval '.user-invocable' .claude/skills/my-skill/SKILL.md
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Directory Structure
+
+Best practices for organizing skills:
+
+<Tabs>
+  <Tab title="Flat Structure">
+    ```text
+    .claude/skills/
+    ├── wrap-up/
+    │   └── SKILL.md
+    ├── search/
+    │   └── SKILL.md
+    └── develop/
+        └── SKILL.md
+    ```
+    
+    Simple, works for &lt;20 skills.
+  </Tab>
+  
+  <Tab title="Categorized">
+    ```text
+    .claude/skills/
+    ├── workflows/
+    │   ├── wrap-up/
+    │   │   └── SKILL.md
+    │   └── develop/
+    │       └── SKILL.md
+    ├── database/
+    │   ├── search/
+    │   │   └── SKILL.md
+    │   └── migrate/
+    │       └── SKILL.md
+    └── patterns/
+        ├── api-conventions/
+        │   └── SKILL.md
+        └── error-handling/
+            └── SKILL.md
+    ```
+    
+    Organized by category, better for >20 skills.
+    
+    <Warning>
+      Skill names must still be unique. `workflows/wrap-up` and `database/wrap-up` would conflict.
+    </Warning>
+  </Tab>
+  
+  <Tab title="With Resources">
+    ```text
+    .claude/skills/
+    └── wrap-up/
+        ├── SKILL.md
+        ├── checklist.md
+        ├── scripts/
+        │   ├── run-tests.sh
+        │   └── report-metrics.sh
+        └── templates/
+            └── summary.md
+    ```
+    
+    Include supporting files in skill directory. Reference them in `SKILL.md`.
+  </Tab>
+</Tabs>
+
+## Plugin Skills
+
+Plugins ship skills in their `skills/` directory:
+
+```text
+~/.claude/plugins/marketplaces/pro-workflow/
+├── .claude-plugin/
+│   └── plugin.json
+├── skills/
+│   ├── pro-workflow/
+│   │   └── SKILL.md
+│   ├── wrap-up/
+│   │   └── SKILL.md
+│   └── orchestrate/
+│       └── SKILL.md
+└── dist/
+```
+
+Plugin skills are automatically discovered when the plugin is installed.
+
+## Dynamic Discovery
+
+Skills can be added at runtime:
+
+```bash
+# Add new skill
+mkdir -p .claude/skills/new-skill
+cat > .claude/skills/new-skill/SKILL.md <<EOF
+---
+name: new-skill
+description: Newly added skill
+user-invocable: true
+---
+
+# New Skill
+
+Instructions here.
+EOF
+
+# Restart Claude Code to discover
+```
+
+<Info>
+  Skills are scanned at startup. Add new skills, then restart Claude Code.
+</Info>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Unique Names" icon="fingerprint">
+    Skill names must be unique across all locations. Use descriptive, specific names.
+  </Card>
+  <Card title="Follow Convention" icon="file-code">
+    Use `skills/<name>/SKILL.md` structure. Don't deviate.
+  </Card>
+  <Card title="Test Discovery" icon="vial">
+    After adding skills, verify they appear in `/` menu.
+  </Card>
+  <Card title="Document Location" icon="map-pin">
+    In skill description, note if it's project-specific or user-wide.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Skill Frontmatter" icon="heading" href="/api/skills/frontmatter">
+    Configure skill metadata
+  </Card>
+  <Card title="Skill Preloading" icon="bolt" href="/api/skills/preloading">
+    Load skills into agents
+  </Card>
+  <Card title="Agent Skills" icon="robot" href="/api/agents/skills">
+    Preload skills into agent context
+  </Card>
+  <Card title="Creating Skills" icon="plus" href="/guides/skills/creating">
+    Build custom skills
+  </Card>
+</CardGroup>

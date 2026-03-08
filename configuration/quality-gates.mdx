@@ -1,0 +1,486 @@
+---
+title: Quality Gates
+description: Automated validation checks to maintain code quality during development
+---
+
+## Overview
+
+Quality gates are automated checkpoints that run linting, typechecking, and tests at strategic moments during development. They help catch issues early and maintain code quality throughout the session.
+
+## Configuration
+
+Quality gates are configured in your project's `config.json`:
+
+```json config.json
+{
+  "quality_gates": {
+    "run_lint": true,
+    "run_typecheck": true,
+    "run_tests": true,
+    "lint_command": "npm run lint",
+    "typecheck_command": "npm run typecheck",
+    "test_command": "npm test -- --related"
+  }
+}
+```
+
+<ParamField path="quality_gates.run_lint" type="boolean" default="true">
+  Enable automatic linting at quality gate checkpoints
+</ParamField>
+
+<ParamField path="quality_gates.run_typecheck" type="boolean" default="true">
+  Enable automatic type checking at quality gate checkpoints
+</ParamField>
+
+<ParamField path="quality_gates.run_tests" type="boolean" default="true">
+  Enable automatic test execution at quality gate checkpoints
+</ParamField>
+
+<ParamField path="quality_gates.lint_command" type="string" default="npm run lint">
+  Shell command to run linting
+</ParamField>
+
+<ParamField path="quality_gates.typecheck_command" type="string" default="npm run typecheck">
+  Shell command to run type checking
+</ParamField>
+
+<ParamField path="quality_gates.test_command" type="string" default="npm test -- --related">
+  Shell command to run tests (typically only affected tests)
+</ParamField>
+
+## When Quality Gates Run
+
+Quality gates trigger automatically at strategic checkpoints:
+
+### Edit Count Thresholds
+
+The system tracks edits and prompts for validation:
+
+| Checkpoint | Default Threshold | Action |
+|------------|------------------|--------|
+| **First** | 5 edits | Review checkpoint - suggest `git diff --stat` |
+| **Second** | 10 edits | Run full quality gates |
+| **Repeat** | Every 10 edits | Run quality gates again |
+
+<Note>
+Thresholds are **adaptive** based on your correction history. If recent sessions have high correction rates, thresholds tighten automatically (e.g., 3/6/6 instead of 5/10/10).
+</Note>
+
+### Adaptive Thresholds
+
+The quality gate script analyzes your recent sessions to determine optimal checkpoint frequency:
+
+```javascript
+if (correctionRate > 0.25) {
+  return { first: 3, second: 6, repeat: 6 };   // Tight gates
+} else if (correctionRate > 0.15) {
+  return { first: 5, second: 10, repeat: 10 }; // Default
+} else if (correctionRate > 0.05) {
+  return { first: 8, second: 15, repeat: 15 }; // Relaxed
+} else {
+  return { first: 10, second: 20, repeat: 20 }; // Very relaxed
+}
+```
+
+**Correction rate** = `corrections_count / edit_count` across last 10 sessions.
+
+## Hook Integration
+
+Quality gates work seamlessly with the hook system:
+
+<CodeGroup>
+```json PostEdit hook (automatic)
+{
+  "PostEdit": [{
+    "command": "node scripts/quality-gate.js",
+    "background": true
+  }]
+}
+```
+
+```json PreCommit hook (validation)
+{
+  "PreCommit": [{
+    "matcher": "true",
+    "hooks": [{
+      "type": "command",
+      "command": "npm run lint && npm run typecheck && npm test -- --related",
+      "continueOnError": false
+    }]
+  }]
+}
+```
+</CodeGroup>
+
+### PostEdit Hook
+
+Runs after every file edit to track edit count and trigger checkpoints:
+
+```bash
+[ProWorkflow] 5 edits — checkpoint for review
+[ProWorkflow] Run: git diff --stat | to see changes
+```
+
+```bash
+[ProWorkflow] 10 edits — run quality gates:
+[ProWorkflow]   npm run lint && npm run typecheck && npm test --changed
+```
+
+### PreCommit Hook
+
+Runs validation before allowing commits to proceed:
+
+```bash
+# If quality gates fail, commit is blocked
+✗ Lint errors found
+✗ Type errors: 3 issues
+✗ Tests failed: 2 tests
+
+PreCommit hook failed. Fix issues before committing.
+```
+
+## Wrap-Up Integration
+
+Quality gates also run during wrap-up phase:
+
+```json config.json
+{
+  "wrap_up": {
+    "check_uncommitted": true,
+    "verify_tests": true,
+    "update_claude_md": true,
+    "create_summary": true
+  }
+}
+```
+
+<ParamField path="wrap_up.check_uncommitted" type="boolean" default="true">
+  Check for uncommitted changes and prompt for action
+</ParamField>
+
+<ParamField path="wrap_up.verify_tests" type="boolean" default="true">
+  Run tests one final time before session ends
+</ParamField>
+
+<ParamField path="wrap_up.update_claude_md" type="boolean" default="true">
+  Update CLAUDE.md with learned patterns
+</ParamField>
+
+<ParamField path="wrap_up.create_summary" type="boolean" default="true">
+  Generate session summary with changes and decisions
+</ParamField>
+
+## Commands Configuration
+
+Customize quality gate commands for your project's tooling:
+
+<AccordionGroup>
+  <Accordion title="ESLint with auto-fix">
+    ```json
+    {
+      "quality_gates": {
+        "lint_command": "npm run lint -- --fix"
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="TypeScript with strict mode">
+    ```json
+    {
+      "quality_gates": {
+        "typecheck_command": "tsc --noEmit --strict"
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Jest with coverage threshold">
+    ```json
+    {
+      "quality_gates": {
+        "test_command": "jest --coverage --coverageThreshold=80 --onlyChanged"
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Vitest for unit tests only">
+    ```json
+    {
+      "quality_gates": {
+        "test_command": "vitest run --changed --testNamePattern='unit'"
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Prettier format check">
+    ```json
+    {
+      "quality_gates": {
+        "lint_command": "prettier --check . && eslint ."
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Parallel execution (faster)">
+    ```json
+    {
+      "quality_gates": {
+        "lint_command": "npm run lint & npm run typecheck & npm test -- --related"
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Quality Gate Script
+
+The reference implementation from `scripts/quality-gate.js`:
+
+<CodeGroup>
+```javascript scripts/quality-gate.js
+#!/usr/bin/env node
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+function getTempDir() {
+  return path.join(os.tmpdir(), 'pro-workflow');
+}
+
+function getAdaptiveThreshold(store) {
+  if (!store) return { first: 5, second: 10, repeat: 10 };
+
+  try {
+    const sessions = store.getRecentSessions(10);
+    if (sessions.length < 3) return { first: 5, second: 10, repeat: 10 };
+
+    const totalEdits = sessions.reduce((s, sess) => s + sess.edit_count, 0);
+    const totalCorrections = sessions.reduce((s, sess) => s + sess.corrections_count, 0);
+    const correctionRate = totalEdits > 0 ? totalCorrections / totalEdits : 0;
+
+    if (correctionRate > 0.25) {
+      return { first: 3, second: 6, repeat: 6 };
+    } else if (correctionRate > 0.15) {
+      return { first: 5, second: 10, repeat: 10 };
+    } else if (correctionRate > 0.05) {
+      return { first: 8, second: 15, repeat: 15 };
+    } else {
+      return { first: 10, second: 20, repeat: 20 };
+    }
+  } catch (e) {
+    return { first: 5, second: 10, repeat: 10 };
+  }
+}
+
+async function main() {
+  const sessionId = process.env.CLAUDE_SESSION_ID || String(process.ppid) || 'default';
+  let count = 1;
+  let threshold = { first: 5, second: 10, repeat: 10 };
+
+  // Track edits and determine threshold...
+  
+  if (count === threshold.first) {
+    console.error(`[ProWorkflow] ${count} edits — checkpoint for review`);
+    console.error('[ProWorkflow] Run: git diff --stat | to see changes');
+  }
+
+  if (count === threshold.second) {
+    console.error(`[ProWorkflow] ${count} edits — run quality gates:`);
+    console.error('[ProWorkflow]   npm run lint && npm run typecheck && npm test --changed');
+  }
+
+  if (count > threshold.second && count % threshold.repeat === 0) {
+    console.error(`[ProWorkflow] ${count} edits — quality gates due`);
+  }
+}
+```
+</CodeGroup>
+
+## Session Tracking
+
+Quality gates integrate with session tracking to improve over time:
+
+```json Database schema
+{
+  "session_id": "unique-session-id",
+  "edit_count": 15,
+  "corrections_count": 2,
+  "quality_gate_runs": 2,
+  "quality_gate_failures": 0,
+  "timestamp": "2026-03-08T10:30:00Z"
+}
+```
+
+The system learns from:
+- **Edit patterns**: How many edits before issues appear
+- **Correction frequency**: How often you need to fix Claude's code
+- **Quality gate success rate**: How often gates pass on first try
+
+## Manual Quality Gates
+
+Run quality gates manually at any time:
+
+```bash
+# Full quality gates
+npm run lint && npm run typecheck && npm test -- --related
+
+# Individual checks
+npm run lint
+npm run typecheck
+npm test -- --related
+
+# Review changes
+git diff --stat
+git status
+```
+
+## Disabling Quality Gates
+
+Disable specific gates when not needed:
+
+```json config.json
+{
+  "quality_gates": {
+    "run_lint": true,
+    "run_typecheck": false,    // Disable typecheck
+    "run_tests": true
+  }
+}
+```
+
+Or disable entirely for prototyping:
+
+```json config.json
+{
+  "quality_gates": {
+    "run_lint": false,
+    "run_typecheck": false,
+    "run_tests": false
+  }
+}
+```
+
+## Performance Optimization
+
+### Run Only Changed Tests
+
+```json
+{
+  "quality_gates": {
+    "test_command": "npm test -- --related --changedSince=HEAD"
+  }
+}
+```
+
+### Cache-Friendly Commands
+
+```json
+{
+  "quality_gates": {
+    "lint_command": "eslint . --cache",
+    "typecheck_command": "tsc --incremental"
+  }
+}
+```
+
+### Parallel Execution
+
+```bash
+# Run all gates in parallel (faster, but harder to debug)
+npm run lint & npm run typecheck & npm test -- --related
+
+# Or use a parallel task runner
+npm install --save-dev concurrently
+npx concurrently "npm:lint" "npm:typecheck" "npm:test"
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Quality gates not triggering">
+    **Cause**: PostEdit hook not configured
+    
+    **Fix**: Add to `hooks.json`:
+    ```json
+    {
+      "PostEdit": [{
+        "command": "node scripts/quality-gate.js",
+        "background": true
+      }]
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Commands failing with 'command not found'">
+    **Cause**: npm scripts not defined in `package.json`
+    
+    **Fix**: Add scripts:
+    ```json
+    {
+      "scripts": {
+        "lint": "eslint .",
+        "typecheck": "tsc --noEmit",
+        "test": "jest"
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Thresholds not adapting">
+    **Cause**: Session database not initialized
+    
+    **Fix**: Check database configuration:
+    ```json
+    {
+      "database": {
+        "path": "~/.pro-workflow/data.db",
+        "auto_init": true
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Gates running too frequently">
+    **Cause**: High correction rate from recent sessions
+    
+    **Fix**: This is intentional - the system detected issues. Improve code quality or manually override thresholds by modifying the script.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Fast Feedback" icon="gauge-high">
+    Keep quality gate commands fast (&lt;10s) for quick feedback loops. Use `--changed` and `--related` flags.
+  </Card>
+  
+  <Card title="Fail Early" icon="circle-xmark">
+    Configure PreCommit hooks to block commits with quality issues. Better to catch errors before they enter git history.
+  </Card>
+  
+  <Card title="Adapt to Project" icon="wrench">
+    Customize commands for your tech stack. Not all projects need all three gates.
+  </Card>
+  
+  <Card title="Monitor Trends" icon="chart-line">
+    Review correction rates periodically. Increasing rates indicate architectural or tooling issues.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Hooks System" icon="webhook" href="/hooks/overview">
+    Learn about the hook events that power quality gates
+  </Card>
+  <Card title="Model Preferences" icon="brain" href="/configuration/model-preferences">
+    Configure models for different task types
+  </Card>
+  <Card title="Wrap-Up Phase" icon="flag-checkered" href="/workflow/wrap-up">
+    Understand end-of-session quality verification
+  </Card>
+</CardGroup>

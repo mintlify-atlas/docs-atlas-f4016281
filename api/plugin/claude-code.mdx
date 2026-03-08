@@ -1,0 +1,360 @@
+---
+title: Claude Code Plugin
+description: Install and configure Pro Workflow as a Claude Code plugin
+---
+
+Pro Workflow ships as a native Claude Code plugin with commands, agents, skills, hooks, and reference guides.
+
+## Plugin Manifest
+
+**Location:** `.claude-plugin/plugin.json`
+
+```json
+{
+  "name": "pro-workflow",
+  "displayName": "Pro Workflow",
+  "version": "1.3.0",
+  "description": "Battle-tested AI coding workflows from power users. Self-correcting memory, parallel worktrees, wrap-up rituals, quality gates, and the 80/20 AI coding ratio.",
+  "author": {
+    "name": "Rohit Ghumare",
+    "email": "ghumare64@gmail.com"
+  },
+  "homepage": "https://github.com/rohitg00/pro-workflow",
+  "repository": "https://github.com/rohitg00/pro-workflow",
+  "logo": "assets/logo.svg",
+  "keywords": [
+    "pro-workflow",
+    "self-correction",
+    "quality-gates",
+    "worktrees",
+    "learning",
+    "code-review"
+  ],
+  "category": "developer-tools",
+  "tags": ["productivity", "workflows", "best-practices"],
+  "skills": "./skills/",
+  "agents": "./agents/",
+  "rules": "./rules/"
+}
+```
+
+## Plugin Structure
+
+```text
+pro-workflow/
+├── .claude-plugin/
+│   ├── plugin.json           # Plugin manifest
+│   └── README.md             # Plugin documentation
+├── agents/
+│   ├── planner.md            # Read-only task planner
+│   ├── reviewer.md           # Code review agent
+│   ├── scout.md              # Confidence-gated exploration
+│   ├── orchestrator.md       # Multi-phase development
+│   └── debugger.md           # Systematic bug investigation
+├── commands/
+│   ├── wrap-up.md            # End-of-session ritual
+│   ├── learn.md              # Best practices guide
+│   ├── search.md             # Search learnings
+│   ├── develop.md            # Multi-phase feature build
+│   └── commit.md             # Smart commit with quality gates
+├── skills/
+│   ├── pro-workflow/         # Complete workflow system
+│   ├── wrap-up/              # Wrap-up ritual
+│   ├── orchestrate/          # Orchestration patterns
+│   ├── replay-learnings/     # Surface past learnings
+│   └── session-handoff/      # Session handoff
+├── hooks/
+│   └── hooks.json            # Pre/Post tool use hooks
+├── docs/
+│   ├── orchestration-patterns.md
+│   ├── settings-guide.md
+│   ├── cli-cheatsheet.md
+│   └── context-loading.md
+├── dist/                     # Compiled TypeScript
+│   ├── db/
+│   └── search/
+└── package.json
+```
+
+## Installation
+
+<Tabs>
+  <Tab title="Via Claude Code">
+    ```bash
+    # Install from marketplace (recommended)
+    claude plugin install pro-workflow
+    ```
+  </Tab>
+  <Tab title="From Source">
+    ```bash
+    # Clone and link
+    git clone https://github.com/rohitg00/pro-workflow.git
+    cd pro-workflow
+    npm install
+    npm run build
+    
+    # Link to Claude Code
+    ln -s $(pwd) ~/.claude/plugins/marketplaces/pro-workflow
+    ```
+  </Tab>
+  <Tab title="Manual">
+    ```bash
+    # Download and extract
+    curl -L https://github.com/rohitg00/pro-workflow/archive/refs/heads/main.zip -o pw.zip
+    unzip pw.zip -d ~/.claude/plugins/marketplaces/pro-workflow
+    cd ~/.claude/plugins/marketplaces/pro-workflow
+    npm install
+    npm run build
+    ```
+  </Tab>
+</Tabs>
+
+## Configuration
+
+Claude Code automatically discovers:
+
+<AccordionGroup>
+  <Accordion title="Commands">
+    Commands in `commands/*.md` are available as `/command-name`.
+    
+    **Example:** `commands/wrap-up.md` → `/wrap-up`
+    
+    View all commands:
+    ```bash
+    # Type / in Claude Code to see available commands
+    /
+    ```
+  </Accordion>
+  
+  <Accordion title="Agents">
+    Agents in `agents/*.md` are available via delegation.
+    
+    **Example:** `agents/planner.md` → "Delegate to planner agent"
+    
+    List agents:
+    ```bash
+    claude agents list
+    ```
+  </Accordion>
+  
+  <Accordion title="Skills">
+    Skills in `skills/*/SKILL.md` are auto-discovered.
+    
+    **Example:** `skills/pro-workflow/SKILL.md` → `/pro-workflow` (if user-invocable)
+    
+    View skills:
+    ```bash
+    # Skills load automatically when agents reference them
+    # Or invoke directly if user-invocable: true
+    /skill-name
+    ```
+  </Accordion>
+  
+  <Accordion title="Hooks">
+    Hooks in `hooks/hooks.json` are merged into Claude Code settings.
+    
+    **Example:** PreToolUse hooks fire before Edit/Write/Bash
+    
+    View active hooks:
+    ```bash
+    cat ~/.claude/settings.json | grep -A 10 hooks
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Plugin-Specific Settings
+
+<ParamField path="CLAUDE_CODE_PRO_WORKFLOW_DB_PATH" type="string" default="~/.pro-workflow/data.db">
+  Custom database location for learnings and sessions.
+</ParamField>
+
+```bash
+export CLAUDE_CODE_PRO_WORKFLOW_DB_PATH="/custom/path/data.db"
+```
+
+<ParamField path="CLAUDE_CODE_PRO_WORKFLOW_AUTO_WRAP_UP" type="boolean" default="false">
+  Automatically run wrap-up ritual on session end.
+</ParamField>
+
+```bash
+export CLAUDE_CODE_PRO_WORKFLOW_AUTO_WRAP_UP=true
+```
+
+## Commands
+
+<CardGroup cols={2}>
+  <Card title="/wrap-up" icon="flag-checkered">
+    End-of-session ritual with quality checks and learning capture.
+  </Card>
+  <Card title="/learn" icon="graduation-cap">
+    Topic-by-topic Claude Code best practices guide.
+  </Card>
+  <Card title="/search" icon="magnifying-glass">
+    Search learnings database by keyword.
+  </Card>
+  <Card title="/develop" icon="code">
+    Multi-phase feature development (Research → Plan → Implement).
+  </Card>
+  <Card title="/commit" icon="git-alt">
+    Smart commit with quality gates and conventional messages.
+  </Card>
+  <Card title="/insights" icon="chart-line">
+    Session analytics and productivity patterns.
+  </Card>
+  <Card title="/replay" icon="rotate-right">
+    Surface relevant past learnings for current task.
+  </Card>
+  <Card title="/handoff" icon="handshake">
+    Generate session handoff document.
+  </Card>
+</CardGroup>
+
+## Agents
+
+<CardGroup cols={2}>
+  <Card title="planner" icon="map">
+    **Tools:** Read, Glob, Grep (read-only)
+    
+    Break down complex tasks into implementation plans. Use when task touches >5 files.
+  </Card>
+  <Card title="reviewer" icon="shield-check">
+    **Tools:** Read, Glob, Grep, Bash
+    
+    Code review and security audits. Use before commits or for PR reviews.
+  </Card>
+  <Card title="scout" icon="binoculars">
+    **Tools:** Read, Glob, Grep, Bash
+    **Mode:** Background, Worktree isolation
+    
+    Confidence-gated exploration. Scores 0-100 and gives GO/HOLD verdict.
+  </Card>
+  <Card title="orchestrator" icon="sitemap">
+    **Tools:** Full access
+    **Model:** Opus 4.6
+    **Memory:** Project-scoped
+    
+    Multi-phase development with Research → Plan → Implement phases.
+  </Card>
+  <Card title="debugger" icon="bug">
+    **Tools:** Read, Glob, Grep, Bash
+    **Model:** Opus 4.6
+    
+    Systematic bug investigation with hypothesis testing.
+  </Card>
+</CardGroup>
+
+## Skills
+
+<CardGroup cols={3}>
+  <Card title="pro-workflow" icon="rocket">
+    Complete workflow system with 10 battle-tested patterns.
+  </Card>
+  <Card title="wrap-up" icon="list-check">
+    End-of-session ritual checklist.
+  </Card>
+  <Card title="orchestrate" icon="diagram-project">
+    Command > Agent > Skill orchestration.
+  </Card>
+  <Card title="replay-learnings" icon="clock-rotate-left">
+    Surface relevant past learnings.
+  </Card>
+  <Card title="session-handoff" icon="arrow-right-arrow-left">
+    Generate handoff documents.
+  </Card>
+  <Card title="smart-commit" icon="code-commit">
+    Quality gates before commits.
+  </Card>
+</CardGroup>
+
+## Hooks
+
+Pro Workflow installs hooks for:
+
+### PreToolUse
+
+- **Edit/Write:** Track edit count, remind at 5/10 edits
+- **git commit:** Remind to run quality gates
+- **git push:** Remind about wrap-up
+
+### PostToolUse
+
+- **Edit/Write (.ts/.js/.py):** Check for console.log, TODOs, secrets
+- **Bash (test commands):** Suggest [LEARN] from failures
+
+### Session Lifecycle
+
+- **SessionStart:** Load learnings, show worktree count
+- **SessionEnd:** Check uncommitted changes, prompt for learnings
+- **Stop:** Context-aware reminders
+- **ConfigChange:** Detect mid-session config modifications
+
+## Database Initialization
+
+The plugin initializes the database on first use:
+
+```bash
+# Manual initialization
+node -e "require('pro-workflow').initializeDatabase(); console.log('Ready')"
+
+# Or via npm script
+npm run db:init
+```
+
+## Upgrading
+
+<Steps>
+  <Step title="Pull latest changes">
+    ```bash
+    cd ~/.claude/plugins/marketplaces/pro-workflow
+    git pull origin main
+    ```
+  </Step>
+  <Step title="Install dependencies">
+    ```bash
+    npm install
+    ```
+  </Step>
+  <Step title="Rebuild">
+    ```bash
+    npm run build
+    ```
+  </Step>
+  <Step title="Restart Claude Code">
+    ```bash
+    # Exit and restart Claude Code
+    exit
+    claude
+    ```
+  </Step>
+</Steps>
+
+## Uninstalling
+
+```bash
+# Remove plugin
+rm -rf ~/.claude/plugins/marketplaces/pro-workflow
+
+# Optionally remove database
+rm -rf ~/.pro-workflow
+```
+
+<Warning>
+  Removing `~/.pro-workflow/` deletes all learnings and session data permanently.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Cursor Plugin" icon="mouse-pointer" href="/api/plugin/cursor">
+    Install for Cursor IDE
+  </Card>
+  <Card title="SkillKit" icon="toolbox" href="/api/plugin/skillkit">
+    Cross-agent skill translation
+  </Card>
+  <Card title="Commands" icon="terminal" href="/api/commands/frontmatter">
+    Build custom commands
+  </Card>
+  <Card title="Agents" icon="robot" href="/api/agents/frontmatter">
+    Create custom agents
+  </Card>
+</CardGroup>

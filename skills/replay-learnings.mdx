@@ -1,0 +1,431 @@
+---
+title: 'Replay Learnings'
+description: 'Surface past learnings relevant to the current task before starting work'
+icon: 'rotate-right'
+---
+
+## Overview
+
+Replay Learnings surfaces relevant past lessons before you start working on a task. It searches your correction history, recalls past mistakes, and applies prior patterns — like muscle memory for your coding sessions.
+
+<Note>
+**Think before you act.** Surface what you've learned before making the same mistake twice.
+</Note>
+
+## Trigger
+
+Use when:
+- Starting a new task
+- Saying "what do I know about", "before I start", "remind me about"
+- After switching contexts or taking a break
+- Working on an area with high past correction rate
+
+<CodeGroup>
+```bash Claude Code
+/replay what do I know about auth
+/replay before I start the API refactor
+/pro-workflow:replay authentication patterns
+```
+
+```bash Cursor
+# Skill is available automatically
+"what have I learned about testing?"
+"replay my learnings about database migrations"
+```
+</CodeGroup>
+
+## Workflow
+
+<Steps>
+  <Step title="Extract Keywords">
+    Extract keywords from the task description
+    
+    Example:
+    - "auth refactor" → `auth`, `middleware`, `refactor`
+    - "add webhook retry" → `webhook`, `retry`, `async`
+  </Step>
+  
+  <Step title="Search Learnings">
+    Search memory for matching patterns
+    
+    ```bash
+    grep -i "auth\|middleware" .claude/LEARNED.md 2>/dev/null
+    grep -i "auth\|middleware" .claude/learning-log.md 2>/dev/null
+    grep -A2 "\[LEARN\]" CLAUDE.md | grep -i "auth\|middleware"
+    ```
+  </Step>
+  
+  <Step title="Check Session History">
+    Look for similar work in past sessions
+    
+    - What was the correction rate?
+    - How many edits vs corrections?
+    - Any recurring patterns?
+  </Step>
+  
+  <Step title="Rank by Relevance">
+    Surface the top learnings ranked by:
+    - Keyword match strength
+    - Application frequency
+    - Recency (newer = more relevant)
+    - Correction impact (high correction rate = important)
+  </Step>
+  
+  <Step title="Provide Briefing">
+    Output a structured briefing with:
+    - Top 3-5 relevant learnings
+    - Session history for similar work
+    - Suggested approach based on patterns
+  </Step>
+</Steps>
+
+<Info>
+If no learnings match, say so explicitly rather than forcing irrelevant results. Suggest using the scout agent to explore first.
+</Info>
+
+## Output Format
+
+```text
+REPLAY BRIEFING: <task>
+=======================
+
+Past learnings (ranked by relevance):
+  1. [Testing] Always mock external APIs in auth tests (applied 8x)
+     Mistake: Called live API in tests, caused flaky failures
+     
+  2. [Navigation] Auth middleware is in src/middleware/ not src/auth/ (applied 5x)
+  
+  3. [Quality] Add error boundary around auth state changes (applied 3x)
+
+Session history for similar work:
+  - 2026-02-01: auth refactor — 23 edits, 2 corrections (8.7% rate) ✓
+  - 2026-01-28: auth middleware — 15 edits, 4 corrections (26.7% rate) ⚠️
+    ^ Higher correction rate — review patterns before starting
+
+Suggested approach:
+  - Mock external APIs (learning #1)
+  - Check src/middleware/ first for auth code (learning #2)
+  - Plan error handling strategy upfront (learning #3)
+```
+
+## Examples
+
+### Example 1: Auth Refactor
+
+```bash
+User: "Before I start refactoring auth, what do I know about it?"
+
+Claude: Searching learnings for 'auth', 'refactor'...
+
+REPLAY BRIEFING: auth refactor
+=======================
+
+Past learnings (3 found):
+  1. [Testing] Mock auth provider in tests, don't call live OAuth (applied 8x)
+     Mistake: Tests were flaky due to network dependency
+     Correction: Added jest.mock('@/lib/auth-provider')
+     
+  2. [Navigation] Auth middleware is in src/middleware/auth.ts (applied 5x)
+     Mistake: Searched in src/auth/ first, wasted time
+     
+  3. [Architecture] Keep session logic in middleware, not components (applied 3x)
+     Mistake: Put session validation in React components
+     Correction: Moved to middleware, components just read state
+
+Session history:
+  - 2026-02-15: OAuth integration — 18 edits, 1 correction (5.6% rate) ✓
+  - 2026-01-28: Auth middleware refactor — 15 edits, 4 corrections (26.7% rate) ⚠️
+  
+  ⚠️ High correction rate on Jan 28. Review what went wrong:
+     - Forgot to mock auth provider (learning #1)
+     - Looked in wrong directory first (learning #2)
+     - Put logic in components instead of middleware (learning #3)
+
+Suggested approach:
+  1. Start in src/middleware/auth.ts (learning #2)
+  2. Set up test mocks first (learning #1)
+  3. Keep session logic in middleware (learning #3)
+  4. Review Jan 28 session notes for additional context
+
+Ready to proceed with this context?
+```
+
+### Example 2: No Learnings Found
+
+```bash
+User: "What do I know about GraphQL subscriptions?"
+
+Claude: Searching learnings for 'graphql', 'subscription'...
+
+REPLAY BRIEFING: GraphQL subscriptions
+=======================
+
+No past learnings found for this topic.
+
+Session history:
+  - No previous work on GraphQL subscriptions
+
+This is new territory. Suggested approach:
+  1. Use scout agent to explore codebase for existing GraphQL patterns
+  2. Check documentation for subscription setup
+  3. Start with a spike/prototype approach
+  4. Capture learnings as you go with /learn-rule
+
+Should I launch a scout agent to explore first?
+```
+
+### Example 3: Database Migrations
+
+```bash
+User: "Replay learnings about database migrations"
+
+Claude: Searching learnings for 'database', 'migration'...
+
+REPLAY BRIEFING: database migrations
+=======================
+
+Past learnings (4 found):
+  1. [Quality] Always test migrations on staging data first (applied 12x)
+     Mistake: Ran migration on prod, corrupted data
+     Correction: Added staging migration step to runbook
+     
+  2. [Git] Create migration + rollback in same commit (applied 7x)
+     Mistake: Pushed migration without rollback, stuck when it failed
+     Correction: Always write `up` and `down` migrations together
+     
+  3. [Testing] Test migration rollback, not just forward (applied 5x)
+     Mistake: Rollback had SQL error, couldn't revert
+     
+  4. [Architecture] Never modify old migrations, create new ones (applied 4x)
+     Mistake: Edited old migration, broke other branches
+
+Session history:
+  - 2026-02-28: Add user_role column — 12 edits, 0 corrections (0% rate) ✓
+  - 2026-02-10: Add indexes to orders — 8 edits, 1 correction (12.5% rate) ✓
+  - 2026-01-15: Schema refactor — 25 edits, 5 corrections (20% rate) ⚠️
+
+✓ Recent migrations went well. Pattern is working.
+
+Suggested approach:
+  1. Write both up and down migrations (learning #2)
+  2. Test rollback in local environment (learning #3)
+  3. Run on staging first (learning #1)
+  4. Don't modify existing migrations (learning #4)
+  5. Follow the pattern from Feb 28 session (zero corrections)
+
+Confident to proceed with migrations?
+```
+
+### Example 4: High Correction Area
+
+```bash
+User: "What have I learned about React performance optimization?"
+
+Claude: Searching learnings for 'react', 'performance', 'optimization'...
+
+REPLAY BRIEFING: React performance optimization
+=======================
+
+Past learnings (5 found):
+  1. [Performance] Use React.memo for expensive pure components (applied 6x)
+     Mistake: Component re-rendered on every parent update
+     
+  2. [Performance] Memoize expensive computations with useMemo (applied 5x)
+     Mistake: Recalculating on every render, caused lag
+     
+  3. [Editing] Don't premature optimize, profile first (applied 4x)
+     Mistake: Added useMemo everywhere, made code harder to read
+     Correction: Use React DevTools Profiler to find actual bottlenecks
+     
+  4. [Performance] Debounce input handlers, don't throttle (applied 3x)
+     Mistake: Used throttle for search, felt laggy
+     
+  5. [Testing] Test performance with realistic data size (applied 2x)
+     Mistake: Tested with 10 items, prod has 10,000
+
+Session history:
+  - 2026-03-01: Optimize table rendering — 18 edits, 5 corrections (27.8% rate) ⚠️
+  - 2026-02-20: Fix slow search — 12 edits, 3 corrections (25% rate) ⚠️
+  - 2026-02-05: Dashboard performance — 20 edits, 6 corrections (30% rate) ⚠️
+
+⚠️ HIGH CORRECTION AREA (avg 27.6% correction rate)
+
+Common mistakes in past sessions:
+  - Optimizing without profiling first (learning #3)
+  - Testing with small datasets (learning #5)
+  - Over-using memoization (learning #3)
+
+Suggested approach:
+  1. ⚠️ PROFILE FIRST with React DevTools (learning #3)
+  2. Test with realistic data (learning #5)
+  3. Start with the highest impact optimizations
+  4. Apply memo/useMemo only where profiler shows benefit
+  5. Capture new learnings — this area needs more patterns
+
+Proceed with extra caution in this area?
+```
+
+## Guardrails
+
+<CardGroup cols={2}>
+  <Card title="Rank by Relevance" icon="ranking-star">
+    Not by recency. A 6-month-old learning about auth is more relevant than yesterday's CSS fix.
+  </Card>
+  <Card title="Include Mistake Context" icon="circle-info">
+    Show the original mistake so the learning is actionable, not just "do X".
+  </Card>
+  <Card title="Flag High Correction Areas" icon="triangle-exclamation">
+    If past sessions in this area had high correction rates, warn the user to proceed carefully.
+  </Card>
+  <Card title="No Results is OK" icon="check">
+    If no learnings match, say so. Don't force irrelevant results. Suggest exploration instead.
+  </Card>
+</CardGroup>
+
+## Integration with Pro Workflow
+
+<CardGroup cols={2}>
+  <Card title="Learn Rule" icon="graduation-cap" href="/skills/learn-rule">
+    Replay surfaces rules captured by learn-rule
+  </Card>
+  <Card title="Orchestrate" icon="diagram-project" href="/skills/orchestrate">
+    Multi-phase development starts with replay in Research phase
+  </Card>
+  <Card title="Insights" icon="chart-line" href="/skills/insights">
+    Session history and correction rates come from insights data
+  </Card>
+  <Card title="Session Handoff" icon="hand-holding-hand" href="/skills/session-handoff">
+    Resume command can trigger replay for context loading
+  </Card>
+</CardGroup>
+
+## Configuration
+
+### Auto-Replay on Session Start
+
+Add to CLAUDE.md:
+
+```markdown
+## Session Start
+
+Before starting any task >5 files:
+1. Run replay-learnings with task keywords
+2. Review top 3 learnings
+3. Acknowledge high correction areas
+4. Proceed with context
+```
+
+### Custom Relevance Scoring
+
+In settings (Claude Code):
+
+```json
+{
+  "learnings": {
+    "replay": {
+      "rankBy": ["relevance", "frequency", "recency"],
+      "maxResults": 5,
+      "includeMistakes": true
+    }
+  }
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Replay Before Starting" icon="play">
+    Make it a habit: replay before starting any task in an area you've worked on before.
+  </Accordion>
+  
+  <Accordion title="Review High Correction Areas" icon="magnifying-glass">
+    If correction rate was >20% in past sessions, review those patterns carefully before starting.
+  </Accordion>
+  
+  <Accordion title="Update Learnings" icon="pen">
+    If replay surfaces a stale or incorrect learning, update or remove it immediately.
+  </Accordion>
+  
+  <Accordion title="Use with Orchestrate" icon="diagram-project">
+    Combine with orchestrate skill: replay in Research phase, apply in Implementation phase.
+  </Accordion>
+</AccordionGroup>
+
+## Advanced: Searchable Learnings
+
+With Pro Workflow plugin (SQLite storage):
+
+```bash
+# Search by keyword
+/search testing
+/search "auth middleware"
+
+# List by category
+/list --category Testing
+
+# Show application frequency
+/insights
+
+# Replay specific category
+/replay --category Performance
+```
+
+Output:
+```bash
+REPLAY BRIEFING: Performance category
+=======================
+
+All Performance learnings (8 total):
+  1. Use React.memo for expensive pure components (applied 6x)
+  2. Memoize expensive computations with useMemo (applied 5x)
+  3. Use indexes for frequently queried fields (applied 4x)
+  ...
+```
+
+## Troubleshooting
+
+### No Learnings Returned
+
+Check:
+1. Are learnings stored in correct location (LEARNED.md or database)?
+2. Try broader keywords: "auth" instead of "OAuth middleware"
+3. Check if learnings exist: `/list`
+
+### Irrelevant Results
+
+Refine search:
+```bash
+# Too broad
+/replay about testing
+
+# More specific
+/replay about testing auth endpoints
+```
+
+### Stale Learnings Surfaced
+
+Remove outdated learnings:
+```bash
+# View all learnings
+/list
+
+# Remove stale ones from LEARNED.md or database
+# Or mark as archived
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Master Learn Rule" icon="graduation-cap" href="/skills/learn-rule">
+    Capture corrections to build your learning database
+  </Card>
+  <Card title="View Insights" icon="chart-line" href="/skills/insights">
+    Analyze learning patterns and correction trends
+  </Card>
+  <Card title="Try Orchestrate" icon="diagram-project" href="/skills/orchestrate">
+    Use replay in Research phase of multi-phase development
+  </Card>
+  <Card title="Explore Pro Workflow" icon="star" href="/skills/pro-workflow">
+    See the complete workflow system
+  </Card>
+</CardGroup>

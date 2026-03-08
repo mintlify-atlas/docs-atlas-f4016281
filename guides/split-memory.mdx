@@ -1,0 +1,486 @@
+---
+title: Split Memory Architecture
+description: How to use multiple CLAUDE.md files and agent-specific memory for better context management
+---
+
+Learn how to split your project memory across multiple files and agents for optimal context usage.
+
+## Why Split Memory?
+
+As projects grow, a single CLAUDE.md becomes unwieldy:
+
+<CardGroup cols={2}>
+  <Card title="Single File Problems" icon="triangle-exclamation">
+    - 500+ lines loaded every session
+    - Package-specific details pollute root context
+    - Team members fight over conventions
+    - Context budget wasted on irrelevant info
+  </Card>
+  
+  <Card title="Split Memory Benefits" icon="check">
+    - Only load what's needed
+    - Package-specific knowledge isolated
+    - Personal preferences separate from team rules
+    - Agent-specific memory for specialized tasks
+  </Card>
+</CardGroup>
+
+## The Three Memory Layers
+
+<Steps>
+  <Step title="Project Memory (CLAUDE.md)">
+    Shared conventions and build commands
+    
+    **Location**: Root and package directories
+    
+    **Loaded**: Automatically based on working directory
+  </Step>
+  
+  <Step title="Personal Memory (CLAUDE.local.md)">
+    Your preferences and shortcuts
+    
+    **Location**: Same as CLAUDE.md, but gitignored
+    
+    **Loaded**: Every session in that directory
+  </Step>
+  
+  <Step title="Agent Memory (MEMORY.md)">
+    Agent-specific learnings and patterns
+    
+    **Location**: `~/.claude/agent-memory/<agent-name>/`
+    
+    **Loaded**: When that agent runs
+  </Step>
+</Steps>
+
+## Pattern 1: Monorepo Split
+
+### Before (Single File)
+
+```text
+monorepo/
+└── CLAUDE.md  (400 lines, loaded always)
+```
+
+### After (Split by Package)
+
+```text
+monorepo/
+├── CLAUDE.md                 (60 lines - shared only)
+├── packages/
+│   ├── api/
+│   │   ├── CLAUDE.md         (120 lines - API details)
+│   │   └── CLAUDE.local.md   (gitignored - your prefs)
+│   ├── web/
+│   │   ├── CLAUDE.md         (100 lines - frontend)
+│   │   └── CLAUDE.local.md
+│   └── mobile/
+│       └── CLAUDE.md         (80 lines - mobile)
+```
+
+<Accordion title="Root CLAUDE.md (60 lines)">
+```markdown
+# MyProject Monorepo
+
+## Build
+pnpm build          # Build all packages
+pnpm test           # Run all tests
+pnpm lint           # Lint everything
+
+## Conventions
+- TypeScript strict mode
+- snake_case for database, camelCase for code
+- All API responses follow RFC 7807 for errors
+
+## Packages
+- `packages/api` - Express REST API (see packages/api/CLAUDE.md)
+- `packages/web` - Next.js frontend (see packages/web/CLAUDE.md)
+- `packages/mobile` - React Native app (see packages/mobile/CLAUDE.md)
+```
+</Accordion>
+
+<Accordion title="packages/api/CLAUDE.md (120 lines)">
+```markdown
+# API Package
+
+## Run
+pnpm dev             # Start with hot reload on :3001
+pnpm test            # Jest with --coverage
+pnpm db:migrate      # Run Prisma migrations
+
+## Architecture
+- Express + Prisma + PostgreSQL
+- Auth: JWT with refresh tokens in httpOnly cookies
+- Rate limiting: Redis sliding window (10 req/s per IP)
+
+## Database
+- Primary: PostgreSQL 15
+- Cache: Redis 7
+- Schema changes require: pnpm prisma generate
+
+## Endpoints
+All endpoints follow:
+- `/api/v1/` prefix
+- Bearer token auth (except /auth/login)
+- Pagination via `?page=X&limit=Y`
+- Errors: RFC 7807 Problem Details
+
+## Testing
+- Unit: Jest with in-memory DB
+- Integration: Real Postgres container
+- E2E: Supertest against test server
+```
+</Accordion>
+
+<Accordion title="packages/api/CLAUDE.local.md (gitignored)">
+```markdown
+# My API Preferences
+
+- I prefer verbose test output: `pnpm test -- --verbose`
+- Always show SQL queries during dev: set DEBUG=prisma:query
+- My local DB runs on port 5433 (not default 5432)
+```
+</Accordion>
+
+## Pattern 2: Agent-Specific Memory
+
+Agents with `memory: user`, `memory: project`, or `memory: local` maintain their own MEMORY.md.
+
+### Debugger Agent with Project Memory
+
+```yaml
+---
+name: debugger
+description: Systematic bug investigation
+tools: ["Read", "Glob", "Grep", "Bash"]
+memory: project
+---
+```
+
+**Memory location**: `~/.claude/agent-memory/debugger/MEMORY.md`
+
+**What it learns**:
+- Common bug patterns in this project
+- Flaky tests and their causes
+- Performance hotspots
+- Error messages and their fixes
+
+<Note>
+The agent auto-curates this file. You don't manually edit it.
+</Note>
+
+### Example Debugger MEMORY.md
+
+```markdown
+# Debugger Agent Memory
+
+## Common Patterns
+
+### "Cannot read property of undefined" in tests
+- Usually missing `await` on Prisma calls
+- Check test setup: DB might not be seeded
+- File: tests/setup.ts has global beforeEach
+
+### Rate limit errors in CI
+- Redis not available in CI (uses in-memory mock)
+- Mock defined in: src/lib/redis-mock.ts
+- Enable with: REDIS_MOCK=true
+
+### Prisma client errors after schema changes
+- Forgot to run: pnpm prisma generate
+- Auto-fixed by pre-commit hook now
+
+## Known Flaky Tests
+
+- `api/auth.test.ts` - timing-sensitive JWT expiration
+  - Fixed by: jest.useFakeTimers()
+  
+- `api/webhooks.test.ts` - race condition on async processing
+  - Fixed by: waitFor() helper
+```
+
+## Pattern 3: Multi-Agent with Split Skills
+
+Different agents need different knowledge. Don't load everything for everyone.
+
+<Tabs>
+  <Tab title="Planner Agent">
+    ```yaml
+    ---
+    name: planner
+    tools: ["Read", "Glob", "Grep"]
+    skills: ["architecture-patterns", "project-structure"]
+    memory: project
+    ---
+    ```
+    
+    **Loads**:
+    - CLAUDE.md from current directory
+    - Skills: architecture-patterns, project-structure
+    - Memory: Past planning decisions
+    
+    **Doesn't load**:
+    - API implementation details
+    - Test configuration
+    - Deployment scripts
+  </Tab>
+  
+  <Tab title="Reviewer Agent">
+    ```yaml
+    ---
+    name: reviewer
+    tools: ["Read", "Grep", "Bash"]
+    skills: ["security-checklist", "performance-patterns"]
+    memory: user
+    ---
+    ```
+    
+    **Loads**:
+    - CLAUDE.md from current directory
+    - Skills: security-checklist, performance-patterns
+    - Memory: Past review findings (across all projects)
+    
+    **Doesn't load**:
+    - Build configuration
+    - Architecture decisions
+    - Personal preferences
+  </Tab>
+  
+  <Tab title="Scout Agent">
+    ```yaml
+    ---
+    name: scout
+    tools: ["Read", "Glob", "Grep", "Bash"]
+    skills: ["confidence-scoring"]
+    memory: project
+    background: true
+    isolation: worktree
+    ---
+    ```
+    
+    **Loads**:
+    - CLAUDE.md from current directory
+    - Skills: confidence-scoring
+    - Memory: Past exploration results
+    - Runs isolated in worktree
+  </Tab>
+</Tabs>
+
+## Memory Scope Comparison
+
+| Scope | Location | Lifespan | Use Case |
+|-------|----------|----------|----------|
+| `user` | `~/.claude/agent-memory/<agent>/` | Permanent (all projects) | Cross-project learnings |
+| `project` | `<project-root>/.claude/agent-memory/<agent>/` | Per project | Project-specific patterns |
+| `local` | `<current-dir>/.claude/agent-memory/<agent>/` | Per directory | Package-specific knowledge |
+
+<Tip>
+**Rule of thumb**: 
+- Use `user` for security patterns (apply everywhere)
+- Use `project` for codebase patterns (this repo only)
+- Use `local` for package quirks (this directory only)
+</Tip>
+
+## Loading Order and Priority
+
+When Claude Code starts, memory loads in this order:
+
+<Steps>
+  <Step title="1. Ancestor CLAUDE.md files">
+    Walk up from current directory to root, loading each CLAUDE.md
+  </Step>
+  
+  <Step title="2. Ancestor CLAUDE.local.md files">
+    Same walk, load personal preferences
+  </Step>
+  
+  <Step title="3. Agent Memory (if agent specified)">
+    Load first 200 lines of agent's MEMORY.md
+  </Step>
+  
+  <Step title="4. Skills (agent frontmatter)">
+    Load full content of skills listed in agent config
+  </Step>
+  
+  <Step title="5. Descendant lazy loading">
+    When accessing files in subdirectories, lazy-load their CLAUDE.md
+  </Step>
+</Steps>
+
+<Warning>
+**Total context used** = Root CLAUDE.md + Package CLAUDE.md + Local preferences + Agent memory + Skills
+
+Keep each layer lean to avoid context bloat.
+</Warning>
+
+## Optimization Checklist
+
+<AccordionGroup>
+  <Accordion title="Root CLAUDE.md < 60 lines">
+    - Only shared conventions
+    - Build commands (1-2 lines each)
+    - High-level architecture
+    - Links to package-level docs
+  </Accordion>
+  
+  <Accordion title="Package CLAUDE.md < 150 lines">
+    - Package-specific build/test commands
+    - Local architecture details
+    - Gotchas and quirks
+    - Dependencies and integrations
+  </Accordion>
+  
+  <Accordion title="CLAUDE.local.md < 30 lines">
+    - Personal shortcuts
+    - Editor preferences
+    - Local environment config
+  </Accordion>
+  
+  <Accordion title="Agent Memory Auto-Curated">
+    - Agent manages this automatically
+    - First 200 lines loaded
+    - Creates topic files when memory grows
+    - Links from MEMORY.md to topic files
+  </Accordion>
+  
+  <Accordion title="Skills: Preload vs On-Demand">
+    - Preload (agent frontmatter): always in context
+    - On-demand (user-invocable): loaded when called
+    - Heavy skills: use `context: fork` for isolation
+  </Accordion>
+</AccordionGroup>
+
+## Real-World Example
+
+### Scenario: Working on API endpoint
+
+You run `claude` from `packages/api/src/routes/`
+
+**What loads**:
+
+```text
+1. /monorepo/CLAUDE.md                    (60 lines - shared conventions)
+2. /monorepo/packages/CLAUDE.md           (if exists)
+3. /monorepo/packages/api/CLAUDE.md       (120 lines - API details)
+4. /monorepo/packages/api/CLAUDE.local.md (30 lines - your prefs)
+5. Agent memory (if using debugger agent) (200 lines - past bugs)
+
+Total: ~410 lines of memory
+```
+
+**What does NOT load**:
+- `packages/web/CLAUDE.md` (sibling package)
+- `packages/mobile/CLAUDE.md` (sibling package)
+- Other agents' memory files
+
+### Scenario: Using planner agent
+
+You run `/planner` with the agent configured as:
+
+```yaml
+---
+name: planner
+tools: ["Read", "Glob", "Grep"]
+skills: ["architecture-patterns"]
+memory: project
+---
+```
+
+**What loads**:
+
+```text
+1. Project CLAUDE.md files (same as before)  (~210 lines)
+2. Planner agent memory                      (200 lines - past plans)
+3. architecture-patterns skill               (150 lines)
+
+Total: ~560 lines
+```
+
+<Tip>
+Planner agent has read-only tools and no access to implementation details, keeping context focused.
+</Tip>
+
+## Migration Guide
+
+<Steps>
+  <Step title="Audit your current CLAUDE.md">
+    ```bash
+    wc -l CLAUDE.md  # Check line count
+    ```
+    
+    If > 150 lines, time to split.
+  </Step>
+  
+  <Step title="Identify package boundaries">
+    ```text
+    monorepo/
+    ├── packages/
+    │   ├── api/      ← Split here
+    │   ├── web/      ← Split here
+    │   └── shared/   ← Split here
+    ```
+  </Step>
+  
+  <Step title="Extract package-specific content">
+    Move API details to `packages/api/CLAUDE.md`
+    
+    Move frontend patterns to `packages/web/CLAUDE.md`
+  </Step>
+  
+  <Step title="Keep root minimal">
+    Root CLAUDE.md should only have:
+    - Shared build commands
+    - Cross-package conventions
+    - Links to package docs
+  </Step>
+  
+  <Step title="Add personal preferences to .local.md">
+    ```bash
+    echo "CLAUDE.local.md" >> .gitignore
+    ```
+    
+    Move your personal shortcuts to CLAUDE.local.md
+  </Step>
+  
+  <Step title="Configure agents with memory scopes">
+    ```yaml
+    # .claude/agents/debugger.md
+    memory: project  # Learns project-specific bugs
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Claude doesn't see my package CLAUDE.md">
+    **Cause**: You're running from root, and haven't accessed files in that package yet.
+    
+    **Solution**: Either:
+    - Run `claude` from within the package directory
+    - Or access a file in that package (triggers descendant loading)
+  </Accordion>
+  
+  <Accordion title="Agent memory not updating">
+    **Cause**: Agent memory is auto-managed. Manual edits get overwritten.
+    
+    **Solution**: Let the agent learn naturally. Use CLAUDE.md for manual rules.
+  </Accordion>
+  
+  <Accordion title="Context still too large">
+    **Cause**: Too many skills preloaded or CLAUDE.md files too long.
+    
+    **Solution**:
+    - Move skills from agent frontmatter to on-demand (user-invocable)
+    - Split large CLAUDE.md into smaller files
+    - Use `context: fork` for heavy skills
+  </Accordion>
+  
+  <Accordion title="Changes in root CLAUDE.md not reflected">
+    **Cause**: Session started before changes, context not refreshed.
+    
+    **Solution**:
+    - Start a new session
+    - Or run `/compact` to reload memory files
+  </Accordion>
+</AccordionGroup>

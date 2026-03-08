@@ -1,0 +1,294 @@
+---
+title: "Hooks & Events Overview"
+description: "Comprehensive guide to Pro Workflow's 18 hook events for building self-correcting AI workflows"
+icon: "webhook"
+---
+
+## What Are Hooks?
+
+Hooks are event-driven automation points that run at specific moments in your Claude Code workflow. Pro Workflow provides **18 hook events** that enable quality gates, learning capture, drift detection, and workflow orchestration.
+
+Think of hooks as the nervous system of your AI workflow—they observe, react, and adapt based on what's happening in your coding session.
+
+<Note>
+Hooks run **automatically** in the background. They don't interrupt Claude's work, but they surface helpful reminders and capture metadata for continuous improvement.
+</Note>
+
+## Why Hooks Matter
+
+The self-correction loop depends on hooks to:
+
+<CardGroup cols={2}>
+  <Card title="Track Patterns" icon="chart-line">
+    Monitor edit counts, correction rates, and quality metrics across sessions
+  </Card>
+  <Card title="Enforce Quality Gates" icon="shield-check">
+    Remind to run lint, typecheck, and tests at optimal checkpoints
+  </Card>
+  <Card title="Capture Learnings" icon="brain">
+    Auto-extract `[LEARN]` blocks from responses into SQLite database
+  </Card>
+  <Card title="Detect Drift" icon="compass">
+    Alert when work diverges from the original task intent
+  </Card>
+</CardGroup>
+
+## The 18 Hook Events
+
+### Session Lifecycle
+
+<Steps>
+  <Step title="SessionStart">
+    Loads learned patterns from database, displays recent session stats, checks for parallel worktrees
+    
+    **When:** New session begins  
+    **Script:** `session-start.js`  
+    **Use Case:** Context restoration, learning replay
+  </Step>
+  
+  <Step title="SessionEnd">
+    Saves session stats to database, reminds about wrap-up, warns about uncommitted changes
+    
+    **When:** Session closes  
+    **Script:** `session-end.js`  
+    **Use Case:** Session archival, final reminders
+  </Step>
+</Steps>
+
+### Tool Execution
+
+| Hook | Trigger | Purpose | Script |
+|------|---------|---------|--------|
+| **PreToolUse** | Before Edit/Write | Track edit count, quality gate reminders | `quality-gate.js` |
+| **PreToolUse** | Before git commit | Remind to run quality gates (lint, typecheck) | Inline script |
+| **PreToolUse** | Before git push | Suggest `/wrap-up` to capture learnings | Inline script |
+| **PostToolUse** | After code edits | Check for console.log, TODOs, secrets | `post-edit-check.js` |
+| **PostToolUse** | After tests | Suggest `[LEARN]` blocks from test failures | Inline script |
+| **PostToolUseFailure** | Tool execution fails | Track failures, suggest debugging learnings | Inline script |
+
+### User Interaction
+
+<CardGroup cols={2}>
+  <Card title="UserPromptSubmit" icon="message">
+    **When:** Each user prompt  
+    **Scripts:**
+    - `prompt-submit.js` - Tracks prompts and correction patterns
+    - `drift-detector.js` - Detects task drift from original intent
+    
+    **Use Case:** Detect when work diverges from the original goal after 6+ edits
+  </Card>
+  
+  <Card title="Stop" icon="stop">
+    **When:** Each response completes  
+    **Scripts:**
+    - `session-check.js` - Context-aware reminders
+    - `learn-capture.js` - Auto-capture `[LEARN]` blocks to database
+    
+    **Use Case:** Passive learning extraction without user action
+  </Card>
+</CardGroup>
+
+### Agent Orchestration
+
+<Steps>
+  <Step title="SubagentStart">
+    Logs when a subagent spawns for observability
+    
+    **When:** Agent teams launch background agents  
+    **Use Case:** Track parallel agent execution in `/develop` workflows
+  </Step>
+  
+  <Step title="SubagentStop">
+    Logs agent completion and captures results
+    
+    **When:** Subagent finishes work  
+    **Use Case:** Collect outputs from planner, reviewer, scout agents
+  </Step>
+  
+  <Step title="TeammateIdle">
+    Detects idle teammates in agent teams
+    
+    **When:** Teammate has no pending work  
+    **Use Case:** Identify blockers, reassign work dynamically
+  </Step>
+</Steps>
+
+### Advanced Events
+
+<CardGroup cols={2}>
+  <Card title="TaskCompleted" icon="check-circle">
+    **Trigger:** Task marked complete  
+    **Action:** Remind to run quality gates before marking done  
+    **Use Case:** Ensure validation before closing tasks
+  </Card>
+  
+  <Card title="PermissionRequest" icon="lock">
+    **Trigger:** Permission dialog appears  
+    **Action:** Flag dangerous operations (rm -rf, deploy, force push)  
+    **Use Case:** Security gate for destructive commands
+  </Card>
+  
+  <Card title="PreCompact" icon="compress">
+    **Trigger:** Before context compaction  
+    **Script:** `pre-compact.js`  
+    **Use Case:** Save context state before compression
+  </Card>
+  
+  <Card title="ConfigChange" icon="gear">
+    **Trigger:** Settings modified mid-session  
+    **Script:** `config-watcher.js`  
+    **Use Case:** Detect when quality gates or hooks are changed
+  </Card>
+  
+  <Card title="Notification" icon="bell">
+    **Trigger:** System events  
+    **Action:** Log permission requests  
+    **Use Case:** Observability for system-level events
+  </Card>
+</CardGroup>
+
+## Hook Configuration
+
+Hooks are defined in `hooks/hooks.json` with this structure:
+
+```json
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "tool == \"Edit\" || tool == \"Write\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/quality-gate.js\""
+          }
+        ],
+        "description": "Track edits for quality gate checks"
+      }
+    ]
+  }
+}
+```
+
+### Matcher Syntax
+
+<CodeGroup>
+```text Tool Name
+tool == "Edit" || tool == "Write"
+```
+
+```text Tool Input Pattern
+tool == "Bash" && tool_input.command matches "git commit"
+```
+
+```text File Extension
+tool == "Edit" && tool_input.file_path matches "\\.(ts|tsx|js|jsx)$"
+```
+
+```text Wildcard
+matcher: "*"
+```
+</CodeGroup>
+
+## Adaptive Quality Gates
+
+The **PreToolUse** hook for edits implements **adaptive thresholds** based on your correction history:
+
+<Steps>
+  <Step title="High Correction Rate (>25%)">
+    - First checkpoint: **3 edits**
+    - Second checkpoint: **6 edits**
+    - Repeat every: **6 edits**
+  </Step>
+  
+  <Step title="Medium Correction Rate (15-25%)">
+    - First checkpoint: **5 edits**
+    - Second checkpoint: **10 edits**
+    - Repeat every: **10 edits**
+  </Step>
+  
+  <Step title="Low Correction Rate (5-15%)">
+    - First checkpoint: **8 edits**
+    - Second checkpoint: **15 edits**
+    - Repeat every: **15 edits**
+  </Step>
+  
+  <Step title="Very Low Correction Rate (<5%)">
+    - First checkpoint: **10 edits**
+    - Second checkpoint: **20 edits**
+    - Repeat every: **20 edits**
+  </Step>
+</Steps>
+
+<Note>
+Correction rates are calculated from the last 10 sessions in your SQLite database. The system **learns** when to remind you based on your actual mistake frequency.
+</Note>
+
+## Database Integration
+
+All hook scripts integrate with the SQLite database at `~/.pro-workflow/data.db`:
+
+```javascript
+function getStore() {
+  const distPath = path.join(__dirname, '..', 'dist', 'db', 'store.js');
+  if (fs.existsSync(distPath)) {
+    const { createStore } = require(distPath);
+    return createStore();
+  }
+  return null;
+}
+```
+
+### Tracked Metrics
+
+- **Session stats:** edit count, correction count, prompt count, duration
+- **Learnings:** category, rule, mistake, correction, project context
+- **Correction rates:** used for adaptive quality gates
+- **Session history:** previous session stats for context restoration
+
+<Warning>
+If the database is unavailable, hooks fall back to temp file storage in `/tmp/pro-workflow/`. The system is **resilient** but database mode provides richer analytics.
+</Warning>
+
+## Hook Output Format
+
+Hooks output to `stderr` with the `[ProWorkflow]` prefix:
+
+```bash
+[ProWorkflow] 5 edits — checkpoint for review
+[ProWorkflow] Run: git diff --stat | to see changes
+[ProWorkflow] Loaded 3 learnings from database:
+  - [Testing] Always run tests before committing
+  - [TypeScript] Check for any types in strict mode
+  - [Git] Use conventional commit format
+```
+
+This format ensures hooks don't interfere with tool output (which uses `stdout`).
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Hook Lifecycle" href="/hooks/lifecycle" icon="diagram-project">
+    Visual guide to hook execution flow and event sequencing
+  </Card>
+  <Card title="Custom Hooks" href="/hooks/custom-hooks" icon="code">
+    Write your own hooks with matchers, scripts, and database integration
+  </Card>
+</CardGroup>
+
+## Available But Not Configured
+
+These hooks are **supported** but not included in the default `hooks.json`:
+
+- **Setup** - One-time initialization
+- **WorktreeCreate** - Set up worktree config
+- **WorktreeRemove** - Cleanup on worktree deletion
+
+Add them to `hooks.json` if you need custom worktree or setup automation.
+
+---
+
+<Note>
+Hooks are the foundation of the self-correction loop. The more sessions you complete, the smarter the system becomes at knowing **when** to remind you.
+</Note>

@@ -1,0 +1,556 @@
+---
+title: 'Context Optimizer'
+description: 'Optimize token usage and context management for long-running sessions'
+icon: 'gauge-high'
+---
+
+## Overview
+
+Context Optimizer helps you manage your context window and token budget effectively. It provides strategies for proactive compaction, MCP audits, subagent delegation, and CLAUDE.md optimization.
+
+<Warning>
+**The "dumb zone" is real.** When context >90%, Claude's responses degrade. Compact before you reach it.
+</Warning>
+
+## Quick Diagnosis
+
+<Steps>
+  <Step title="Check Current Usage">
+    Run `/context` to see current usage
+  </Step>
+  <Step title="Compact if >70%">
+    Compact now before quality degrades
+  </Step>
+  <Step title="Emergency Compact if >90%">
+    You're in the "dumb zone" — compact immediately
+  </Step>
+</Steps>
+
+## Optimization Strategies
+
+### Immediate Actions
+
+| Action | Saves | When |
+|--------|-------|------|
+| `/compact` | 30-50% context | At task boundaries |
+| Disable unused MCPs | ~5% per MCP | When switching domains |
+| Use subagents for exploration | Keeps main context clean | Heavy search/read tasks |
+| Fresh session via `/resume` | 100% reset | When starting unrelated work |
+
+### Configuration
+
+Set proactive auto-compaction:
+
+```json
+{
+  "env": {
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "50"
+  }
+}
+```
+
+<Note>
+Default auto-compact triggers at ~95%. Override to 50% for proactive compaction before quality degrades.
+</Note>
+
+## Context Discipline Rules
+
+<AccordionGroup>
+  <Accordion title="1. Read Before Edit" icon="book">
+    Always read files before editing. Builds accurate context.
+    
+    **Bad:**
+    ```text
+    User: Add error handling to utils.ts
+    Claude: [Edits without reading]
+    ```
+    
+    **Good:**
+    ```text
+    User: Add error handling to utils.ts
+    Claude: [Reads file first, then edits]
+    ```
+  </Accordion>
+  
+  <Accordion title="2. Compact at Task Boundaries" icon="scissors">
+    Manual compact between major tasks
+    
+    **Good compact points:**
+    - After planning, before execution
+    - After completing a feature
+    - When context >70%
+    - Before switching task domains
+    
+    ```bash
+    /compact
+    ```
+  </Accordion>
+  
+  <Accordion title="3. Disable Unused MCPs" icon="plug">
+    Keep &lt;10 MCPs enabled, &lt;80 tools total
+    
+    ```bash
+    # List active MCPs
+    /mcp
+    
+    # Disable unused
+    # (via settings or .mcp.json)
+    ```
+    
+    Each MCP adds overhead to every request.
+  </Accordion>
+  
+  <Accordion title="4. Summarize Explorations" icon="compress">
+    After exploring code, summarize findings
+    
+    **Instead of:**
+    - 50 file reads in context
+    
+    **Do:**
+    - Explore with subagent
+    - Subagent returns summary
+    - Main session stays clean
+  </Accordion>
+  
+  <Accordion title="5. Delegate High-Volume Tasks" icon="people-arrows">
+    Use subagents to isolate high-volume output
+    
+    **Delegate to subagents:**
+    - Test suite output
+    - Large file exploration
+    - Documentation generation
+    - Log analysis
+    
+    Main session context stays clean.
+  </Accordion>
+</AccordionGroup>
+
+## Context Compaction
+
+### How It Works
+
+- **Auto-compacts at ~95%** capacity (keeps long-running agents alive)
+- **Configure earlier**: `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50`
+- **PreCompact hooks** save state before compaction
+- **Subagents auto-compact** independently from main session
+
+### Manual Compaction
+
+```bash
+# Compact now
+/compact
+
+# Check usage first
+/context
+```
+
+<Tabs>
+  <Tab title="Before Compact">
+    ```text
+    Context: 145,000 / 200,000 tokens (72.5%)
+    
+    Messages: 47
+    Tool calls: 23
+    Files read: 18
+    ```
+  </Tab>
+  <Tab title="After Compact">
+    ```text
+    Context: 68,000 / 200,000 tokens (34%)
+    
+    Compacted 47 messages to summary
+    Retained recent conversation
+    Preserved key decisions
+    ```
+  </Tab>
+</Tabs>
+
+## MCP Audit
+
+Keep &lt;10 MCPs enabled, &lt;80 tools total.
+
+### Essential MCPs
+
+<CardGroup cols={3}>
+  <Card title="context7" icon="book">
+    Live documentation lookup
+  </Card>
+  <Card title="playwright" icon="browser">
+    Browser automation (token-efficient)
+  </Card>
+  <Card title="github" icon="github">
+    PRs, issues, code search
+  </Card>
+</CardGroup>
+
+### Audit Process
+
+```bash
+# List active MCPs
+/mcp
+
+# Count total tools
+# Goal: <80 tools
+```
+
+**Remove:**
+- MCPs used &lt;1x per week
+- Overlapping functionality (e.g., 2 database MCPs)
+- Development-only MCPs in production sessions
+
+**Keep:**
+- Essential for current project domain
+- Used &gt;3x per session
+- No alternatives available
+
+## Prompt Engineering for Efficiency
+
+### Scoped Prompts
+
+<CodeGroup>
+```text Bad (Vague)
+"Fix the code"
+```
+
+```text Good (Scoped)
+"In src/auth/, fix the login rate limiting bug"
+```
+</CodeGroup>
+
+Vague prompts force Claude to read everything. Scoped prompts target specific areas.
+
+### Provide Constraints
+
+<CodeGroup>
+```text Bad
+"Refactor the API"
+```
+
+```text Good
+"Refactor the API. Don't modify the middleware. Keep existing endpoint signatures."
+```
+</CodeGroup>
+
+Constraints prevent unnecessary exploration.
+
+### Give Acceptance Criteria
+
+<CodeGroup>
+```text Bad
+"Add rate limiting"
+```
+
+```text Good
+"Add rate limiting: 5 attempts per IP per minute, return 429 with Retry-After header."
+```
+</CodeGroup>
+
+Clear criteria reduce back-and-forth.
+
+## Subagent Delegation
+
+Heavy operations that generate lots of output should go to subagents:
+
+<AccordionGroup>
+  <Accordion title="Test Suite Output" icon="vial">
+    ```yaml
+    ---
+    name: test-runner
+    tools: ["Bash"]
+    background: true
+    ---
+    
+    Run the test suite and report:
+    - Pass/fail status
+    - Failed tests with error messages
+    - Coverage percentage
+    
+    Don't include full output in main session.
+    ```
+  </Accordion>
+  
+  <Accordion title="Large File Exploration" icon="magnifying-glass">
+    ```yaml
+    ---
+    name: scout
+    tools: ["Read", "Glob", "Grep"]
+    background: true
+    isolation: worktree
+    ---
+    
+    Explore the codebase and find:
+    - Relevant files
+    - Similar patterns
+    - Dependencies
+    
+    Return summary only, not full file contents.
+    ```
+  </Accordion>
+  
+  <Accordion title="Documentation Generation" icon="file-lines">
+    ```yaml
+    ---
+    name: documenter
+    tools: ["Read", "Write"]
+    context: fork
+    ---
+    
+    Generate documentation for the API.
+    Work in isolated context, don't pollute main session.
+    ```
+  </Accordion>
+  
+  <Accordion title="Log Analysis" icon="chart-line">
+    ```yaml
+    ---
+    name: log-analyzer
+    tools: ["Read", "Grep"]
+    background: true
+    ---
+    
+    Analyze error logs and find:
+    - Most common errors
+    - Patterns by timestamp
+    - Affected endpoints
+    
+    Return summary only.
+    ```
+  </Accordion>
+</AccordionGroup>
+
+The main session stays clean while subagents handle the volume.
+
+## Context Budget Planning
+
+Plan your context usage by phase:
+
+| Phase | Target Usage | Action If Over |
+|-------|-------------|----------------|
+| **Planning** | &lt; 20% | Keep plans concise |
+| **Implementation** | &lt; 60% | Compact between files |
+| **Testing** | &lt; 80% | Delegate to subagent |
+| **Review** | &lt; 90% | Start fresh session |
+
+<Info>
+If you hit 90% during implementation, you're doing too much in one session. Compact or break into smaller tasks.
+</Info>
+
+## CLAUDE.md Optimization
+
+### Size Guidelines
+
+- **Root CLAUDE.md**: &lt; 60 lines ideal, &lt; 150 max
+- **Package-level**: Move package-specific info here
+- **CLAUDE.local.md**: Personal preferences
+- **Remove**: Obvious or rapidly-changing information
+
+### Split Memory Architecture
+
+```text
+.claude/
+├── CLAUDE.md          # Entry point (<60 lines)
+├── AGENTS.md          # Workflow rules
+├── SOUL.md            # Style preferences
+└── LEARNED.md         # Auto-populated learnings
+```
+
+**Benefits:**
+- Keeps root file concise
+- Modular, easy to maintain
+- Learnings don't clutter core instructions
+
+## When Context Is Degraded
+
+### Signs
+
+- Claude repeats itself or forgets earlier context
+- Responses become generic or lose project-specific knowledge
+- Tool calls start failing for reasons that worked earlier
+- "I don't recall" or "I don't have that information"
+
+### Fix
+
+<Steps>
+  <Step title="Manual Compact">
+    ```bash
+    /compact
+    ```
+    
+    Often fixes degradation immediately.
+  </Step>
+  
+  <Step title="Fresh Session (If Still Bad)">
+    ```bash
+    /resume
+    ```
+    
+    Starts new session with clean context, loads recent history.
+  </Step>
+  
+  <Step title="Reduce Size (Recurring Issues)">
+    - Shrink CLAUDE.md
+    - Disable unused MCPs
+    - Use `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50`
+  </Step>
+</Steps>
+
+## Examples
+
+### Example 1: Proactive Compaction
+
+```bash
+User: Check context usage
+
+Claude: Current context: 142,000 / 200,000 tokens (71%)
+
+⚠️ Approaching auto-compact threshold. Recommend manual compact now.
+
+User: /compact
+
+Claude: Compacting context...
+
+✓ Context reduced: 142,000 → 65,000 tokens (32.5%)
+
+Retained:
+- Last 10 messages
+- Key decisions from this session
+- Current task context
+
+Ready to continue.
+```
+
+### Example 2: MCP Audit
+
+```bash
+User: Why is Claude feeling slow?
+
+Claude: Checking configuration...
+
+Active MCPs: 14
+Total tools: 127
+
+⚠️ High MCP count (recommend <10)
+⚠️ High tool count (recommend <80)
+
+Unused MCPs (last 7 days):
+- postgres-mcp (0 calls)
+- redis-mcp (0 calls)
+- docker-mcp (1 call)
+- kubernetes-mcp (0 calls)
+
+Recommendation: Disable unused MCPs
+
+Should I create a minimal MCP config?
+```
+
+### Example 3: Subagent Delegation
+
+```bash
+User: Run the full test suite
+
+Claude: Test suites generate high output. Using subagent...
+
+[Spawns test-runner subagent in background]
+
+Subagent running: npm test
+Main session context stays clean.
+
+[2 minutes later]
+
+Subagent report:
+✓ Tests: 245 passed, 3 failed
+✗ Failures:
+  - auth.test.ts:42 "should rate limit login"
+  - api.test.ts:18 "should handle timeout"
+  - db.test.ts:55 "should rollback transaction"
+
+Coverage: 87%
+
+[Full output not in main session context]
+
+Should I fix the failing tests?
+```
+
+## Integration with Pro Workflow
+
+<CardGroup cols={2}>
+  <Card title="Pro Workflow" icon="star" href="/skills/pro-workflow">
+    Context discipline is a core pattern
+  </Card>
+  <Card title="Parallel Worktrees" icon="code-branch" href="/skills/parallel-worktrees">
+    Worktrees isolate context by task
+  </Card>
+  <Card title="Orchestrate" icon="diagram-project" href="/skills/orchestrate">
+    Subagents keep research phase context clean
+  </Card>
+  <Card title="Insights" icon="chart-line" href="/skills/insights">
+    Track context usage patterns over time
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Compact at 50%, Not 95%" icon="gauge">
+    Don't wait for auto-compact. Manual compact at 50% keeps quality high.
+  </Accordion>
+  
+  <Accordion title="Start Sessions Clean" icon="sparkles">
+    Use `/resume` to start fresh with relevant history, not `/reopen` with full context.
+  </Accordion>
+  
+  <Accordion title="One Domain Per Session" icon="folder">
+    Don't work on auth, then database, then UI in one session. Context gets muddy.
+  </Accordion>
+  
+  <Accordion title="Delegate Heavy Operations" icon="people-arrows">
+    Tests, logs, large file reads — all go to subagents. Main session for high-level decisions.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### Context Always Full
+
+Check:
+1. CLAUDE.md size (&lt;60 lines?)
+2. Active MCP count (&lt;10?)
+3. Auto-compact percentage (set to 50%?)
+4. Are you reading too many files without summarizing?
+
+### Auto-Compact Not Triggering
+
+Verify:
+```json
+{
+  "env": {
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "50"
+  }
+}
+```
+
+Default is 95% — too late for quality.
+
+### Subagents Not Helping
+
+Ensure:
+1. Subagent has `background: true`
+2. Subagent returns summary, not full output
+3. Main session doesn't read subagent's tool outputs
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Master Pro Workflow" icon="star" href="/skills/pro-workflow">
+    Context discipline is a core pillar
+  </Card>
+  <Card title="Try Parallel Worktrees" icon="code-branch" href="/skills/parallel-worktrees">
+    Isolate context by task with worktrees
+  </Card>
+  <Card title="Learn Orchestrate" icon="diagram-project" href="/skills/orchestrate">
+    Multi-phase development with clean context
+  </Card>
+  <Card title="View All Skills" icon="puzzle-piece" href="/skills/overview">
+    Explore the complete skill system
+  </Card>
+</CardGroup>

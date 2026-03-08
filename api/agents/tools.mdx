@@ -1,0 +1,481 @@
+---
+title: Agent Tools
+description: Constrain agent tool access for security and workflow control
+---
+
+Tool constraints define what actions an agent can perform. Use whitelists (`tools`) or blacklists (`disallowedTools`) to enforce read-only access, prevent shell execution, or block file creation.
+
+## Available Tools
+
+### Read Tools
+
+<ParamField path="Read" type="tool">
+  Read files from the filesystem. Line ranges and offsets supported.
+</ParamField>
+
+<ParamField path="Glob" type="tool">
+  Pattern-based file search. Example: `**/*.ts`.
+</ParamField>
+
+<ParamField path="Grep" type="tool">
+  Content search with regex. Fast full-text search.
+</ParamField>
+
+### Write Tools
+
+<ParamField path="Edit" type="tool">
+  Edit existing files with string replacement. Requires prior Read.
+</ParamField>
+
+<ParamField path="Write" type="tool">
+  Create new files or overwrite existing ones.
+</ParamField>
+
+### Execution Tools
+
+<ParamField path="Bash" type="tool">
+  Execute shell commands. Can read/write files, install packages, run tests.
+</ParamField>
+
+### Other Tools
+
+<ParamField path="Task" type="tool">
+  Delegate to subagents or specialized tools.
+</ParamField>
+
+<ParamField path="WebFetch" type="tool">
+  Fetch web content (documentation, APIs, etc.).
+</ParamField>
+
+<ParamField path="Skill" type="tool">
+  Invoke user-defined skills.
+</ParamField>
+
+## Tool Whitelisting
+
+Use `tools` to explicitly allow specific tools:
+
+<CodeGroup>
+
+```yaml Read-Only
+---
+name: planner
+tools: ["Read", "Glob", "Grep"]
+---
+
+Agent can explore code but not make changes.
+```
+
+```yaml Edit-Only
+---
+name: refactor
+tools: ["Read", "Edit"]
+---
+
+Agent can read and edit existing files only. No new files, no shell commands.
+```
+
+```yaml Documentation
+---
+name: doc-writer
+tools: ["Read", "Write", "WebFetch"]
+---
+
+Agent can read code, write docs, and fetch external references.
+```
+
+</CodeGroup>
+
+<Info>
+  When `tools` is specified, **only** those tools are available. All others are blocked.
+</Info>
+
+## Tool Blacklisting
+
+Use `disallowedTools` to block specific tools:
+
+<CodeGroup>
+
+```yaml No Shell Access
+---
+name: safe-explorer
+disallowedTools: ["Bash"]
+---
+
+Agent can use all tools except shell execution.
+```
+
+```yaml No File Creation
+---
+name: reader
+disallowedTools: ["Write", "Bash"]
+---
+
+Agent can read and edit existing files, but not create new ones.
+```
+
+```yaml Read-Only (via Blacklist)
+---
+name: viewer
+disallowedTools: ["Edit", "Write", "Bash"]
+---
+
+Agent can only read files. No modifications allowed.
+```
+
+</CodeGroup>
+
+<Warning>
+  `disallowedTools` overrides `tools`. If a tool is in both lists, it's blocked.
+</Warning>
+
+## Common Tool Sets
+
+### Exploration Agents
+
+```yaml
+---
+name: explorer
+tools: ["Read", "Glob", "Grep", "WebFetch"]
+model: haiku
+permissionMode: auto
+---
+
+Fast exploration without modifying code.
+```
+
+**Use for:** Understanding codebases, finding patterns, generating reports.
+
+### Planning Agents
+
+```yaml
+---
+name: planner
+tools: ["Read", "Glob", "Grep"]
+model: opus
+---
+
+Deep analysis and plan generation without code changes.
+```
+
+**Use for:** Architecture decisions, task breakdowns, risk assessment.
+
+### Review Agents
+
+```yaml
+---
+name: reviewer
+tools: ["Read", "Glob", "Grep", "Bash"]
+---
+
+Code review with test execution but no modifications.
+```
+
+**Use for:** PR reviews, security audits, quality checks.
+
+### Implementation Agents
+
+```yaml
+---
+name: implementer
+tools: ["Read", "Glob", "Grep", "Edit", "Bash"]
+---
+
+Implementation with editing and testing. No new file creation.
+```
+
+**Use for:** Refactoring, bug fixes, incremental features.
+
+### Full-Access Agents
+
+```yaml
+---
+name: orchestrator
+tools: ["Read", "Glob", "Grep", "Bash", "Edit", "Write"]
+model: opus
+memory: project
+---
+
+Complete tool access for complex features.
+```
+
+**Use for:** Multi-phase development, new features, major refactors.
+
+## Tool Combinations
+
+### Read + Edit (No Create)
+
+```yaml
+---
+name: safe-refactor
+tools: ["Read", "Edit"]
+---
+```
+
+**Allows:**
+- Read existing files
+- Edit existing files
+
+**Blocks:**
+- Create new files (no Write)
+- Run shell commands (no Bash)
+- Search files (no Glob/Grep)
+
+### Read + Grep + Edit (Pattern-Based Editing)
+
+```yaml
+---
+name: pattern-refactor
+tools: ["Read", "Grep", "Edit"]
+---
+```
+
+**Allows:**
+- Search for patterns
+- Read matching files
+- Edit matching files
+
+**Blocks:**
+- Create new files
+- Run tests
+- File system traversal (no Glob)
+
+### Read + Bash (Validation)
+
+```yaml
+---
+name: validator
+tools: ["Read", "Bash"]
+---
+```
+
+**Allows:**
+- Read files
+- Run lint, typecheck, tests
+
+**Blocks:**
+- Edit files
+- Create files
+- Search (must know file paths)
+
+## Security Considerations
+
+### Dangerous Tool: Bash
+
+`Bash` has full shell access:
+- Can read/write any file
+- Can install packages
+- Can delete files
+- Can make network requests
+
+<Warning>
+  Only grant `Bash` to trusted agents. Use `permissionMode: ask` for human oversight.
+</Warning>
+
+### Safe Alternative: Read + Edit
+
+For code modifications without shell access:
+
+```yaml
+---
+name: safe-implementer
+tools: ["Read", "Glob", "Grep", "Edit"]
+---
+
+Agent can modify code but not run arbitrary shell commands.
+```
+
+### Write Tool Risks
+
+`Write` can:
+- Overwrite critical files (e.g., `package.json`, `.env`)
+- Create files outside project directory
+- Bypass git tracking
+
+<Tip>
+  Use `Edit` instead of `Write` when possible. `Edit` requires reading the file first, providing a safety check.
+</Tip>
+
+## Permission Modes
+
+Control approval flow with `permissionMode`:
+
+<Tabs>
+  <Tab title="ask (Default)">
+    ```yaml
+    ---
+    name: careful-agent
+    permissionMode: ask
+    ---
+    
+    Ask before every tool use.
+    ```
+  </Tab>
+  <Tab title="auto">
+    ```yaml
+    ---
+    name: auto-agent
+    tools: ["Read", "Glob", "Grep"]
+    permissionMode: auto
+    ---
+    
+    Auto-approve all tool uses (safe with read-only tools).
+    ```
+  </Tab>
+  <Tab title="dangerous-only">
+    ```yaml
+    ---
+    name: smart-agent
+    permissionMode: dangerous-only
+    ---
+    
+    Ask only for Bash, Write, and destructive operations.
+    ```
+  </Tab>
+</Tabs>
+
+<Info>
+  Combine `tools` constraints with `permissionMode: auto` for fully autonomous read-only agents.
+</Info>
+
+## Examples by Use Case
+
+<Accordion title="Code Exploration">
+
+```yaml
+---
+name: explorer
+description: Fast read-only codebase exploration
+tools: ["Read", "Glob", "Grep"]
+model: haiku
+permissionMode: auto
+background: true
+---
+
+Explore codebase in background without blocking main session.
+
+Workflow:
+1. Glob for file patterns
+2. Grep for content matches
+3. Read relevant files
+4. Summarize findings
+```
+
+</Accordion>
+
+<Accordion title="Automated Refactoring">
+
+```yaml
+---
+name: refactor
+description: Apply safe refactorings to existing code
+tools: ["Read", "Glob", "Grep", "Edit"]
+permissionMode: dangerous-only
+---
+
+Refactor code without creating new files or running shell commands.
+
+Workflow:
+1. Grep for pattern to refactor
+2. Read each matching file
+3. Edit with transformation
+4. Present summary for review
+```
+
+</Accordion>
+
+<Accordion title="Quality Gates">
+
+```yaml
+---
+name: quality-gate
+description: Run quality checks without modifying code
+tools: ["Read", "Bash"]
+permissionMode: auto
+---
+
+Run lint, typecheck, and tests.
+
+Workflow:
+1. npm run lint
+2. npm run typecheck
+3. npm test -- --related
+4. Report results
+```
+
+</Accordion>
+
+<Accordion title="Documentation Generation">
+
+```yaml
+---
+name: doc-gen
+description: Generate documentation from source code
+tools: ["Read", "Glob", "Write", "WebFetch"]
+---
+
+Generate docs from code.
+
+Workflow:
+1. Glob for source files
+2. Read each file
+3. Extract types, interfaces, functions
+4. WebFetch for external API docs
+5. Write markdown documentation
+```
+
+</Accordion>
+
+## Tool Performance
+
+| Tool | Speed | Context Cost |
+|------|-------|-------------|
+| **Glob** | Fast (&lt;10ms) | Low (paths only) |
+| **Grep** | Fast (&lt;50ms) | Low (matches only) |
+| **Read** | Medium (10-100ms) | High (full file) |
+| **Edit** | Medium (50-200ms) | Medium (diff only) |
+| **Write** | Fast (&lt;50ms) | Medium (new content) |
+| **Bash** | Variable | Variable |
+
+<Tip>
+  Use Glob/Grep for discovery, then Read only the files you need. Avoid reading entire codebases.
+</Tip>
+
+## Debugging Tool Constraints
+
+If an agent can't use a tool:
+
+```bash
+# Check agent configuration
+cat .claude/agents/my-agent.md | grep -A 5 'tools:'
+
+# Verify tool name (case-sensitive)
+echo "Tools: Read, Glob, Grep, Bash, Edit, Write"
+
+# Test with minimal agent
+cat > .claude/agents/test.md <<EOF
+---
+name: test
+tools: ["Read"]
+---
+
+Test agent with only Read tool.
+EOF
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Agent Frontmatter" icon="file-lines" href="/api/agents/frontmatter">
+    Complete agent configuration
+  </Card>
+  <Card title="Agent Skills" icon="brain" href="/api/agents/skills">
+    Preload domain knowledge
+  </Card>
+  <Card title="Agent Memory" icon="database" href="/api/agents/memory">
+    Configure memory scope
+  </Card>
+  <Card title="Security Guide" icon="shield" href="/guides/security/agents">
+    Agent security best practices
+  </Card>
+</CardGroup>

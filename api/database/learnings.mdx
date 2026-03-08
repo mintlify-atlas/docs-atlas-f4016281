@@ -1,0 +1,307 @@
+---
+title: Learnings API
+description: CRUD operations for persistent learning storage
+---
+
+The Learnings API provides methods to store, retrieve, update, and delete learnings. Each learning captures a rule, mistake, and correction from your coding sessions.
+
+## Learning Interface
+
+```typescript
+export interface Learning {
+  id: number;                    // Auto-incrementing primary key
+  created_at: string;            // ISO 8601 timestamp
+  project: string | null;        // Project scope (null = global)
+  category: string;              // e.g., "Testing", "Git", "Architecture"
+  rule: string;                  // The corrected behavior
+  mistake: string | null;        // What went wrong
+  correction: string | null;     // How it was fixed
+  times_applied: number;         // Usage counter
+}
+```
+
+<Note>
+  The `times_applied` counter tracks how often a learning is referenced. Use `incrementTimesApplied()` to update it.
+</Note>
+
+## Store Methods
+
+All methods are available on the `Store` instance returned by `createStore()`.
+
+### addLearning
+
+<ParamField path="learning" type="Omit<Learning, 'id' | 'created_at' | 'times_applied'>" required>
+  Learning data to insert. `id`, `created_at`, and `times_applied` are auto-generated.
+</ParamField>
+
+<ParamField path="learning.project" type="string | null">
+  Project name (e.g., `"my-app"`) or `null` for global learnings.
+</ParamField>
+
+<ParamField path="learning.category" type="string" required>
+  Category for grouping. Common values: `Testing`, `Git`, `Editing`, `Architecture`, `Performance`, `Claude-Code`.
+</ParamField>
+
+<ParamField path="learning.rule" type="string" required>
+  One-line description of the correct behavior. This is the primary searchable field.
+</ParamField>
+
+<ParamField path="learning.mistake" type="string | null">
+  What went wrong. Can be `null` for proactive learnings.
+</ParamField>
+
+<ParamField path="learning.correction" type="string | null">
+  How the mistake was fixed. Can be `null` for proactive learnings.
+</ParamField>
+
+<ResponseField name="return" type="Learning">
+  The inserted learning with auto-generated `id` and `created_at`.
+</ResponseField>
+
+<CodeGroup>
+
+```typescript Add Learning
+import { createStore } from 'pro-workflow';
+
+const store = createStore();
+
+const learning = store.addLearning({
+  project: 'my-app',
+  category: 'Testing',
+  rule: 'Run tests after editing API endpoints',
+  mistake: 'Pushed broken /users endpoint',
+  correction: 'Added npm test to pre-push hook'
+});
+
+console.log(`Saved as learning #${learning.id}`);
+store.close();
+```
+
+```typescript Global Learning
+const learning = store.addLearning({
+  project: null,  // Available to all projects
+  category: 'Git',
+  rule: 'Always pull before creating new branch',
+  mistake: 'Created branch from stale main',
+  correction: 'Added git pull to branch creation script'
+});
+```
+
+</CodeGroup>
+
+### getLearning
+
+<ParamField path="id" type="number" required>
+  Learning ID to retrieve.
+</ParamField>
+
+<ResponseField name="return" type="Learning | undefined">
+  The learning if found, otherwise `undefined`.
+</ResponseField>
+
+```typescript
+const learning = store.getLearning(42);
+if (learning) {
+  console.log(learning.rule);
+}
+```
+
+### getAllLearnings
+
+<ParamField path="project" type="string | undefined">
+  Filter by project name. If omitted, returns all learnings.
+</ParamField>
+
+<ResponseField name="return" type="Learning[]">
+  Array of learnings sorted by `created_at DESC`.
+</ResponseField>
+
+<Info>
+  When filtering by project, learnings with `project: null` are always included (global learnings).
+</Info>
+
+<CodeGroup>
+
+```typescript All Learnings
+const allLearnings = store.getAllLearnings();
+console.log(`Total: ${allLearnings.length}`);
+```
+
+```typescript Project-Scoped
+const projectLearnings = store.getAllLearnings('my-app');
+// Includes both project-specific and global learnings
+```
+
+</CodeGroup>
+
+### updateLearning
+
+<ParamField path="id" type="number" required>
+  Learning ID to update.
+</ParamField>
+
+<ParamField path="updates" type="Partial<Learning>" required>
+  Fields to update. Only `category`, `rule`, `mistake`, and `correction` can be updated.
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  `true` if the update succeeded, `false` if the learning was not found.
+</ResponseField>
+
+<Warning>
+  You cannot update `id`, `created_at`, `project`, or `times_applied` directly. Use `incrementTimesApplied()` for the counter.
+</Warning>
+
+```typescript
+const success = store.updateLearning(42, {
+  rule: 'Run tests and lint before pushing',
+  correction: 'Added npm run verify to pre-push hook'
+});
+
+if (success) {
+  console.log('Learning updated');
+}
+```
+
+### deleteLearning
+
+<ParamField path="id" type="number" required>
+  Learning ID to delete.
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  `true` if deleted, `false` if not found.
+</ResponseField>
+
+<Tip>
+  Deleting a learning automatically removes it from the FTS index via triggers.
+</Tip>
+
+```typescript
+const deleted = store.deleteLearning(42);
+if (deleted) {
+  console.log('Learning removed');
+}
+```
+
+### incrementTimesApplied
+
+<ParamField path="id" type="number" required>
+  Learning ID to increment.
+</ParamField>
+
+<ResponseField name="return" type="void">
+  No return value. The counter is incremented atomically.
+</ResponseField>
+
+```typescript
+// Mark a learning as applied
+store.incrementTimesApplied(42);
+```
+
+<Note>
+  Use this when a learning is successfully applied in a session. Helps surface frequently-used patterns.
+</Note>
+
+## Categories
+
+Recommended categories for consistency:
+
+<Accordion title="Standard Categories">
+
+| Category | Use For |
+|----------|--------|
+| **Navigation** | File paths, finding code |
+| **Editing** | Code change patterns |
+| **Testing** | Test approaches, coverage |
+| **Git** | Commits, branches, merges |
+| **Quality** | Lint, types, style |
+| **Context** | When to clarify requirements |
+| **Architecture** | Design decisions |
+| **Performance** | Optimization patterns |
+| **Claude-Code** | Sessions, modes, CLAUDE.md |
+| **Prompting** | Scope, constraints, acceptance criteria |
+| **Debugging** | Root cause analysis |
+| **Security** | Auth, secrets, validation |
+
+</Accordion>
+
+## Examples
+
+<CodeGroup>
+
+```typescript Hook Integration
+// In a PostToolUse hook
+import { createStore } from 'pro-workflow';
+
+const store = createStore();
+
+if (toolName === 'Edit' && output.includes('console.log')) {
+  store.addLearning({
+    project: process.env.PROJECT_NAME,
+    category: 'Quality',
+    rule: 'Remove console.log before committing',
+    mistake: 'Left debug logging in production code',
+    correction: 'Added eslint rule to catch console statements'
+  });
+}
+
+store.close();
+```
+
+```typescript Batch Operations
+import { createStore } from 'pro-workflow';
+
+const store = createStore();
+
+const rules = [
+  { category: 'Testing', rule: 'Test edge cases first' },
+  { category: 'Git', rule: 'Small commits, clear messages' },
+  { category: 'Editing', rule: 'Read before editing' }
+];
+
+for (const rule of rules) {
+  store.addLearning({
+    project: null,
+    category: rule.category,
+    rule: rule.rule,
+    mistake: null,
+    correction: null
+  });
+}
+
+store.close();
+```
+
+```bash CLI Access
+# Add learning via CLI
+sqlite3 ~/.pro-workflow/data.db \
+  "INSERT INTO learnings (project, category, rule, mistake, correction) \
+   VALUES ('my-app', 'Testing', 'Run tests after edits', 'Broke prod', 'Added hook');"
+
+# Count learnings
+sqlite3 ~/.pro-workflow/data.db "SELECT COUNT(*) FROM learnings;"
+
+# List by category
+sqlite3 ~/.pro-workflow/data.db \
+  "SELECT rule FROM learnings WHERE category = 'Testing' ORDER BY times_applied DESC;"
+```
+
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Search API" icon="magnifying-glass" href="/api/database/search">
+    Full-text search for learnings
+  </Card>
+  <Card title="Sessions API" icon="clock" href="/api/database/sessions">
+    Track session activity
+  </Card>
+  <Card title="Commands" icon="terminal" href="/api/commands/frontmatter">
+    Use learnings in slash commands
+  </Card>
+  <Card title="Agents" icon="robot" href="/api/agents/memory">
+    Preload learnings into agents
+  </Card>
+</CardGroup>

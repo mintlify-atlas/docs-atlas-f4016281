@@ -1,0 +1,562 @@
+---
+title: Agent Frontmatter
+description: Configure agents with YAML frontmatter for specialized workflows
+---
+
+Agents in Pro Workflow are markdown files with YAML frontmatter that define specialized AI assistants with constrained tools, preloaded skills, and custom configuration.
+
+## Agent Structure
+
+```markdown
+---
+name: agent-name
+description: What this agent does (include PROACTIVELY for auto-invoke)
+tools: ["Read", "Glob", "Grep"]
+disallowedTools: ["Bash"]
+model: opus
+permissionMode: auto
+maxTurns: 50
+skills: ["api-conventions", "project-patterns"]
+mcpServers: {"github": {...}}
+hooks: {...}
+memory: project
+background: true
+isolation: worktree
+color: blue
+---
+
+# Agent System Prompt
+
+Detailed instructions for the agent.
+
+## Workflow
+
+1. Step one
+2. Step two
+
+## Output Format
+
+Expected output.
+```
+
+## Frontmatter Fields
+
+### Core Configuration
+
+<ParamField path="name" type="string" required>
+  Agent identifier. Used for delegation: "Delegate to the **planner** agent".
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  Short description of when to use this agent. Include **PROACTIVELY** to enable auto-invocation.
+  
+  Example: "Break down complex tasks. Use PROACTIVELY when task touches >5 files."
+</ParamField>
+
+<Info>
+  Agents with **PROACTIVELY** in their description can be auto-invoked by Claude Code when conditions match.
+</Info>
+
+### Tool Constraints
+
+<ParamField path="tools" type="string[]">
+  Whitelist of allowed tools. Only these tools will be available to the agent.
+  
+  Common tool sets:
+  - Read-only: `["Read", "Glob", "Grep"]`
+  - Editing: `["Read", "Edit"]`
+  - Full access: `["Read", "Glob", "Grep", "Bash", "Edit", "Write"]`
+</ParamField>
+
+<ParamField path="disallowedTools" type="string[]">
+  Blacklist of blocked tools. Overrides `tools` whitelist.
+  
+  Example: `["Bash", "Write"]` for safe exploration.
+</ParamField>
+
+<CodeGroup>
+
+```yaml Read-Only Agent
+---
+name: planner
+tools: ["Read", "Glob", "Grep"]
+---
+
+Explore code without making changes.
+```
+
+```yaml Editing Agent
+---
+name: refactor
+tools: ["Read", "Edit"]
+disallowedTools: ["Bash", "Write"]
+---
+
+Edit existing files only. No new files or shell commands.
+```
+
+```yaml Full Access
+---
+name: orchestrator
+tools: ["Read", "Glob", "Grep", "Bash", "Edit", "Write"]
+---
+
+Complete tool access for implementation.
+```
+
+</CodeGroup>
+
+### Model Selection
+
+<ParamField path="model" type="string">
+  Model override for this agent. Values: `opus`, `sonnet`, `haiku`.
+  
+  - **opus**: Deep reasoning, architecture, hard bugs
+  - **sonnet**: Balanced work, features
+  - **haiku**: Quick exploration, read-only tasks
+</ParamField>
+
+```yaml
+---
+name: planner
+model: opus
+tools: ["Read", "Glob", "Grep"]
+---
+
+Use Opus for deep architectural planning.
+```
+
+### Permission Mode
+
+<ParamField path="permissionMode" type="string">
+  Permission level for tool use. Values:
+  - `auto`: Auto-approve all tool uses
+  - `ask`: Ask before each tool use (default)
+  - `dangerous-only`: Ask only for dangerous operations
+</ParamField>
+
+```yaml
+---
+name: scout
+permissionMode: auto
+tools: ["Read", "Glob", "Grep"]
+---
+
+Read-only agent with auto-approval (no user interaction needed).
+```
+
+### Turn Limit
+
+<ParamField path="maxTurns" type="number" default="100">
+  Maximum conversation turns before agent stops. Prevents runaway execution.
+</ParamField>
+
+```yaml
+---
+name: quick-explorer
+maxTurns: 10
+---
+
+Limited to 10 turns for fast exploration.
+```
+
+### Skills
+
+<ParamField path="skills" type="string[]">
+  Skills to preload into agent context at startup. Full skill content is injected.
+  
+  Use for domain knowledge the agent always needs.
+</ParamField>
+
+```yaml
+---
+name: orchestrator
+skills: ["pro-workflow", "api-conventions"]
+---
+
+Agent starts with Pro Workflow patterns and API conventions already loaded.
+```
+
+<Tip>
+  Skills are loaded from `skills/*/SKILL.md`. See [Skills API](/api/skills/frontmatter) for details.
+</Tip>
+
+### MCP Servers
+
+<ParamField path="mcpServers" type="object">
+  Agent-specific MCP server configuration. Overrides global MCP settings.
+</ParamField>
+
+```yaml
+---
+name: github-reviewer
+mcpServers:
+  github:
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_TOKEN: "${GITHUB_TOKEN}"
+---
+
+Agent with GitHub MCP server for PR reviews.
+```
+
+### Hooks
+
+<ParamField path="hooks" type="object">
+  Agent-specific hooks for lifecycle events.
+</ParamField>
+
+```yaml
+---
+name: quality-gate
+hooks:
+  SubagentStart:
+    - command: "echo 'Starting quality gate agent'"
+  SubagentStop:
+    - command: "npm run report-metrics"
+---
+
+Agent with custom hooks for metrics reporting.
+```
+
+### Memory
+
+<ParamField path="memory" type="string">
+  Memory scope for the agent. Values:
+  - `user`: User-wide memory (default)
+  - `project`: Project-scoped memory
+  - `local`: Session-only memory (ephemeral)
+</ParamField>
+
+```yaml
+---
+name: orchestrator
+memory: project
+---
+
+Agent recalls patterns from previous sessions in this project.
+```
+
+### Background Execution
+
+<ParamField path="background" type="boolean" default="false">
+  Whether the agent runs in the background by default. Background agents don't block the main session.
+</ParamField>
+
+```yaml
+---
+name: scout
+background: true
+isolation: worktree
+---
+
+Agent runs in background with worktree isolation (non-blocking exploration).
+```
+
+### Isolation
+
+<ParamField path="isolation" type="string">
+  Isolation mode for agent execution. Values:
+  - `worktree`: Create isolated git worktree for this agent
+</ParamField>
+
+```yaml
+---
+name: scout
+isolation: worktree
+---
+
+Agent gets its own git worktree for safe exploration.
+```
+
+<Warning>
+  Worktree isolation requires git repository. Agent will fail if not in a git repo.
+</Warning>
+
+### Color (Agent Teams)
+
+<ParamField path="color" type="string">
+  Display color for agent in agent teams view. Values: `red`, `blue`, `green`, `yellow`, `magenta`, `cyan`.
+</ParamField>
+
+```yaml
+---
+name: frontend-agent
+color: blue
+---
+
+Displays in blue in agent teams UI.
+```
+
+## Complete Examples
+
+<Accordion title="Planner Agent (Read-Only)">
+
+```markdown
+---
+name: planner
+description: Break down complex tasks into implementation plans before writing code. Use when task touches >5 files, requires architecture decisions, or has unclear requirements.
+tools: ["Read", "Glob", "Grep"]
+model: opus
+---
+
+# Planner
+
+Read-only task planner for complex work.
+
+## Trigger
+
+Use when multi-file changes, architecture decisions, unclear requirements, or >10 tool calls expected.
+
+## Workflow
+
+1. Understand the goal
+2. Explore relevant code (read-only)
+3. Identify all files to change
+4. List dependencies and ordering
+5. Estimate complexity
+6. Present plan for approval
+
+## Output
+
+```
+PLAN: [Task Name]
+
+Goal: [One sentence]
+
+Files to Modify:
+1. path/to/file.ts - [what changes]
+
+Approach:
+[Step by step]
+
+Risks:
+- [Potential issues]
+
+Questions:
+- [Clarifications needed]
+```
+
+## Rules
+
+- Never make changes. Read-only exploration.
+- Never skip approval step.
+- Never assume requirements. Ask when unclear.
+```
+
+</Accordion>
+
+<Accordion title="Orchestrator Agent (Multi-Phase)">
+
+```markdown
+---
+name: orchestrator
+description: Multi-phase development agent. Research > Plan > Implement with validation gates. Use PROACTIVELY when building features that touch >5 files or require architecture decisions.
+tools: ["Read", "Glob", "Grep", "Bash", "Edit", "Write"]
+skills: ["pro-workflow"]
+model: opus
+memory: project
+---
+
+# Orchestrator - Multi-Phase Development
+
+Build features through three validated phases.
+
+## Phase 1: Research (GO/NO-GO)
+
+1. Find all relevant files and patterns
+2. Check dependencies and constraints
+3. Identify existing patterns to follow
+4. Score confidence (0-100 across 5 dimensions)
+
+Score >= 70 → GO to planning
+Score < 70 → Gather more context, re-score
+
+## Phase 2: Plan (Approval Required)
+
+Design the solution. Present for approval before any code changes.
+
+Wait for explicit "proceed" or "approved" before Phase 3.
+
+## Phase 3: Implement
+
+Execute the plan step by step:
+1. Make changes in plan order
+2. Run tests after each file
+3. Pause for review every 5 edits
+4. Run full quality gates at end
+
+## Rules
+
+- Never skip phases
+- Never proceed without approval
+- Use project memory to recall patterns
+- Capture learnings: `[LEARN] Category: Rule`
+```
+
+</Accordion>
+
+<Accordion title="Scout Agent (Background, Worktree)">
+
+```markdown
+---
+name: scout
+description: Confidence-gated exploration that assesses readiness before implementation. Scores 0-100 across five dimensions and gives GO/HOLD verdict.
+tools: ["Read", "Glob", "Grep", "Bash"]
+background: true
+isolation: worktree
+permissionMode: auto
+---
+
+# Scout - Confidence-Gated Exploration
+
+Assess whether there's enough context to implement a task confidently.
+
+Runs in background with worktree isolation (non-blocking).
+
+## Workflow
+
+1. Receive task description
+2. Explore codebase in isolated worktree
+3. Score confidence (0-100)
+4. If >= 70: GO with findings
+5. If < 70: Identify gaps, gather context, re-score
+
+## Confidence Scoring
+
+Rate each dimension (0-20 points):
+- **Scope clarity** - Know exactly what files change?
+- **Pattern familiarity** - Similar patterns exist?
+- **Dependency awareness** - Know what depends on changed code?
+- **Edge case coverage** - Can identify edge cases?
+- **Test strategy** - Know how to verify changes?
+
+## Output
+
+```
+SCOUT REPORT
+Task: [description]
+Confidence: [score]/100
+
+Dimensions:
+  Scope clarity:        [x]/20
+  Pattern familiarity:  [x]/20
+  Dependency awareness: [x]/20
+  Edge case coverage:   [x]/20
+  Test strategy:        [x]/20
+
+VERDICT: GO / HOLD
+```
+
+## Rules
+
+- Never edit files. Read-only exploration.
+- Be honest about gaps. False GO wastes time.
+- Re-score after gathering context.
+- Escalate to user if < 70 after 2 rounds.
+```
+
+</Accordion>
+
+<Accordion title="Reviewer Agent (Quality Gates)">
+
+```markdown
+---
+name: reviewer
+description: Code review specialist that checks for logic errors, security issues, and quality problems. Use before committing, for PR reviews, or after major changes.
+tools: ["Read", "Glob", "Grep", "Bash"]
+model: sonnet
+---
+
+# Reviewer
+
+Code review and quality checks.
+
+## Checklist
+
+1. **Logic** - Does it do what's intended?
+2. **Edge Cases** - Null, empty, bounds?
+3. **Errors** - Proper handling?
+4. **Security** - Injection, auth, secrets?
+5. **Performance** - O(n^2) loops, memory?
+6. **Tests** - Coverage adequate?
+
+## Output
+
+```
+REVIEW: [Files/PR]
+
+Critical:
+- [Must fix before merge]
+
+High:
+- [Should fix]
+
+Medium:
+- [Nice to fix]
+
+Low:
+- [Suggestions]
+
+Approved? [Yes/No with conditions]
+```
+
+## Rules
+
+- Never auto-approve without review
+- Never skip security checks
+- Suggest fixes, don't just flag problems
+```
+
+</Accordion>
+
+## Agent Discovery
+
+Agents are discovered from:
+
+1. **Project:** `.claude/agents/*.md`
+2. **User:** `~/.claude/agents/*.md`
+3. **Plugin:** `~/.claude/plugins/*/agents/*.md`
+
+## Precedence
+
+When multiple agents have the same name:
+
+1. Project (`.claude/agents/`) — highest priority
+2. User (`~/.claude/agents/`)
+3. Plugin (`~/.claude/plugins/*/agents/`) — lowest priority
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Single Purpose" icon="bullseye">
+    Each agent does one thing well. Don't create swiss-army-knife agents.
+  </Card>
+  <Card title="Clear Triggers" icon="lightbulb">
+    Document when to use the agent. Include **PROACTIVELY** for auto-invoke.
+  </Card>
+  <Card title="Constrain Tools" icon="shield">
+    Use minimal tools needed. Read-only when possible.
+  </Card>
+  <Card title="Preload Skills" icon="brain">
+    Load domain knowledge via `skills` field for better context.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Agent Tools" icon="wrench" href="/api/agents/tools">
+    Configure tool constraints
+  </Card>
+  <Card title="Agent Skills" icon="sparkles" href="/api/agents/skills">
+    Preload skills into agents
+  </Card>
+  <Card title="Agent Memory" icon="database" href="/api/agents/memory">
+    Configure agent memory scope
+  </Card>
+  <Card title="Delegation" icon="share-nodes" href="/api/commands/delegation">
+    Delegate commands to agents
+  </Card>
+</CardGroup>

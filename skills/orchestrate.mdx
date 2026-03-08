@@ -1,0 +1,555 @@
+---
+title: 'Orchestrate'
+description: 'Wire Commands, Agents, and Skills together for multi-phase feature development'
+icon: 'diagram-project'
+---
+
+## Overview
+
+Orchestrate wires Commands, Agents, and Skills together for complex features. It implements a structured multi-phase development workflow: Research → Plan → Implement → Review with validation gates between each phase.
+
+<Note>
+**Never skip phases. Never proceed without approval between phases.**
+</Note>
+
+## The Pattern
+
+```text
+/develop <feature>
+  │
+  ├── Phase 1: Research (orchestrator agent)
+  │   └── Score confidence → GO/HOLD
+  │
+  ├── Phase 2: Plan (orchestrator agent)
+  │   └── Present plan → wait for approval
+  │
+  ├── Phase 3: Implement (orchestrator agent)
+  │   └── Execute plan → quality gates
+  │
+  └── Phase 4: Review (reviewer agent)
+      └── Code review → commit
+```
+
+## Usage
+
+When asked to build a feature:
+
+<Steps>
+  <Step title="Start with Research">
+    Delegate to orchestrator or scout agent to explore the codebase
+    
+    **Outputs:**
+    - Relevant files found
+    - Similar patterns discovered
+    - Dependencies identified
+    - Confidence score (0-100)
+  </Step>
+  
+  <Step title="Wait for GO/HOLD">
+    Don't proceed if confidence is below 70
+    
+    - **Score ≥70**: HOLD — Ask user for more context
+    - **Score >70**: GO — Proceed to planning
+  </Step>
+  
+  <Step title="Present a Plan">
+    List all files to change, the approach, and risks
+    
+    **Plan includes:**
+    - Files to create/modify/delete
+    - Approach summary
+    - Risk assessment
+    - Estimated complexity
+  </Step>
+  
+  <Step title="Get Approval">
+    Never implement without explicit "proceed"
+    
+    Wait for:
+    - ✅ "proceed"
+    - ✅ "looks good"
+    - ✅ "go ahead"
+    
+    Or handle:
+    - ❌ "revise the plan"
+    - ❌ "different approach"
+  </Step>
+  
+  <Step title="Implement Step by Step">
+    Execute plan with quality gates every 5 edits
+    
+    **Quality gates:**
+    - Lint check
+    - Type check
+    - Tests on affected files
+    - Pause for review at checkpoints
+  </Step>
+  
+  <Step title="Review Before Commit">
+    Run reviewer agent on changes
+    
+    **Review checklist:**
+    - Security vulnerabilities
+    - Performance issues
+    - Test coverage
+    - Code quality
+  </Step>
+</Steps>
+
+## When to Use This
+
+<CardGroup cols={2}>
+  <Card title="Feature > 5 Files" icon="files">
+    Multi-file changes benefit from structured phases
+  </Card>
+  <Card title="Architecture Decisions" icon="building">
+    Major design choices need planning and approval
+  </Card>
+  <Card title="Unclear Requirements" icon="circle-question">
+    Research phase explores options before committing
+  </Card>
+  <Card title="Cross-Cutting Concerns" icon="arrows-cross">
+    Auth, logging, error handling touch many parts
+  </Card>
+</CardGroup>
+
+## When NOT to Use This
+
+<CardGroup cols={2}>
+  <Card title="Quick Bug Fixes" icon="wrench">
+    Just fix it — orchestration is overkill
+  </Card>
+  <Card title="Single-File Changes" icon="file">
+    No need for multi-phase workflow
+  </Card>
+  <Card title="Well-Understood Patterns" icon="book">
+    Follow existing code directly
+  </Card>
+  <Card title="Documentation Only" icon="file-lines">
+    Simple edits don't need phases
+  </Card>
+</CardGroup>
+
+## Agent Selection
+
+Choose the right agent for each phase:
+
+| Phase | Agent | Why |
+|-------|-------|-----|
+| **Research** | scout (background, worktree) | Non-blocking exploration, safe isolation |
+| **Plan** | orchestrator (opus, memory) | Deep reasoning, pattern recall |
+| **Implement** | orchestrator (opus, memory) | Full tool access, persistent context |
+| **Review** | reviewer (read + bash) | Security and quality focus |
+| **Debug** | debugger (opus, memory) | Systematic investigation |
+
+### Scout Agent (Research)
+
+```yaml
+---
+name: scout
+description: PROACTIVELY explore codebase when confidence is low
+tools: ["Read", "Glob", "Grep"]
+background: true
+isolation: worktree
+model: haiku
+---
+
+You are a scout agent. Explore the codebase to:
+1. Find similar patterns
+2. Identify relevant files
+3. Score confidence (0-100)
+4. Report back with findings
+
+Never make changes. Read-only exploration.
+```
+
+**Key features:**
+- Runs in background (doesn't block main session)
+- Worktree isolation (safe to explore)
+- Fast model (Haiku) for quick exploration
+- Read-only tools
+
+### Orchestrator Agent (Plan + Implement)
+
+```yaml
+---
+name: orchestrator
+description: Multi-phase feature development with RPI workflow
+tools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash"]
+skills: ["pro-workflow", "project-patterns"]
+memory: project
+model: opus
+---
+
+You orchestrate multi-phase development:
+
+**Phase 1: Research**
+- Explore codebase
+- Find similar patterns
+- Score confidence (0-100)
+- GO if >70, HOLD if ≥70
+
+**Phase 2: Plan**
+- List files to change
+- Describe approach
+- Identify risks
+- Wait for approval
+
+**Phase 3: Implement**
+- Execute plan step by step
+- Quality gates every 5 edits
+- Never proceed without approval
+
+**Phase 4: Review**
+- Delegate to reviewer agent
+- Fix issues found
+- Commit when clean
+```
+
+**Key features:**
+- Full tool access
+- Opus model for deep reasoning
+- Project memory (remembers patterns)
+- Preloaded skills
+
+### Reviewer Agent (Review)
+
+```yaml
+---
+name: reviewer
+description: Code review with security focus
+tools: ["Read", "Grep", "Bash"]
+isolation: worktree
+model: opus
+---
+
+You are a code reviewer. Check:
+
+1. **Security**
+   - SQL injection
+   - XSS vulnerabilities
+   - Authentication issues
+   - Secret exposure
+
+2. **Performance**
+   - O(n^2) loops
+   - Missing indexes
+   - Unnecessary queries
+
+3. **Quality**
+   - Test coverage
+   - Error handling
+   - Code duplication
+
+4. **Best Practices**
+   - Follow project patterns
+   - Consistent style
+   - Clear naming
+
+Never modify code. Report findings with severity:
+- 🔴 Critical: Must fix
+- 🟡 Warning: Should fix
+- 🟢 Info: Consider
+```
+
+## Example Flow
+
+### Complete Feature Development
+
+```bash
+User: /develop add webhook retry logic with exponential backoff
+
+Claude: Starting multi-phase development...
+
+=====================================
+PHASE 1: RESEARCH
+=====================================
+
+Launching scout agent to explore...
+
+[Scout agent exploring in background]
+
+Scout findings:
+✓ Found: src/lib/webhooks.ts (existing webhook logic)
+✓ Found: src/types/webhook.ts (types defined)
+✓ Found: tests/webhooks.test.ts (test structure)
+✓ Pattern: Similar retry logic in src/lib/api-client.ts
+
+Confidence: 85/100 ✓ GO
+
+Relevant files:
+- src/lib/webhooks.ts (modify)
+- src/types/webhook.ts (extend)
+- tests/webhooks.test.ts (add tests)
+- src/config/webhooks.ts (new)
+
+=====================================
+PHASE 2: PLAN
+=====================================
+
+Proposed approach:
+
+1. **Add retry configuration**
+   - Max retries: 5
+   - Delays: 1s, 2s, 4s, 8s, 16s (exponential)
+   - Add jitter (0-500ms) to prevent thundering herd
+
+2. **Extend WebhookAttempt type**
+   - Add attempt_number, next_retry_at fields
+   - Store full request/response for debugging
+
+3. **Implement retry logic**
+   - Use setTimeout for delays (switch to queue in future)
+   - Track attempts in database
+   - Mark as failed after max retries
+
+4. **Add tests**
+   - Mock setTimeout (avoid slow tests)
+   - Test exponential backoff calculation
+   - Test max retry limit
+   - Test jitter range
+
+Files to change:
+- CREATE src/config/webhooks.ts (config)
+- MODIFY src/lib/webhooks.ts (add retry logic)
+- MODIFY src/types/webhook.ts (extend types)
+- MODIFY tests/webhooks.test.ts (add 8 test cases)
+
+Risks:
+⚠️ setTimeout won't work in serverless (need queue later)
+⚠️ Webhook signatures need recalculation on retry
+
+Estimated complexity: Medium (4-6 files, ~200 LOC)
+
+Proceed? (y/n)
+
+User: y
+
+=====================================
+PHASE 3: IMPLEMENT
+=====================================
+
+Implementing step by step...
+
+[1/4] Creating webhook configuration...
+✓ Created src/config/webhooks.ts
+
+[2/4] Implementing retry logic...
+✓ Modified src/lib/webhooks.ts
+
+Checkpoint: 2 files modified
+Running quality gates...
+✓ Lint: passed
+✓ Typecheck: passed
+
+Continuing...
+
+[3/4] Extending webhook types...
+✓ Modified src/types/webhook.ts
+
+[4/4] Adding test coverage...
+✓ Modified tests/webhooks.test.ts
+
+Final quality gates...
+✓ Lint: passed
+✓ Typecheck: passed
+✓ Tests: 23 passed, 0 failed
+
+Implementation complete.
+
+=====================================
+PHASE 4: REVIEW
+=====================================
+
+Launching reviewer agent...
+
+[Reviewer agent checking code]
+
+Review findings:
+
+🟢 Info:
+- Consider adding timeout configuration (currently hardcoded)
+- Webhook signature recalculation not implemented (noted in comments)
+
+🟡 Warning:
+- setTimeout approach won't work in serverless environments
+  → TODO added: "Switch to queue-based retry for serverless"
+
+✓ Security: No issues
+✓ Performance: No issues
+✓ Test coverage: 8 new tests, all passing
+
+Code quality: Good ✓
+
+Ready to commit? (y/n)
+
+User: y
+
+=====================================
+COMMIT
+=====================================
+
+Running /smart-commit...
+
+Staging files:
+- src/config/webhooks.ts
+- src/lib/webhooks.ts
+- src/types/webhook.ts
+- tests/webhooks.test.ts
+
+Commit message:
+
+feat(webhooks): add retry logic with exponential backoff
+
+Implements webhook retry with exponential backoff and jitter.
+Retries up to 5 times with delays: 1s, 2s, 4s, 8s, 16s.
+Adds random jitter (0-500ms) to prevent thundering herd.
+
+Stores full request/response for debugging. Marks webhook
+as permanently failed after max retries exhausted.
+
+Note: Uses setTimeout (not serverless-compatible). Will
+switch to queue-based approach in future iteration.
+
+✓ Committed: a3f5c21
+
+=====================================
+FEATURE COMPLETE
+=====================================
+
+Webhook retry logic implemented and committed.
+
+Learnings captured:
+- [Testing] Mock setTimeout to avoid slow tests
+- [Architecture] Store attempts in separate table for observability
+
+Next steps:
+- Deploy to staging
+- Test with real webhook failures
+- Plan queue-based retry for serverless
+```
+
+## Integration with Pro Workflow
+
+<CardGroup cols={2}>
+  <Card title="Smart Commit" icon="code-commit" href="/skills/smart-commit">
+    Orchestrate ends with smart-commit for quality commits
+  </Card>
+  <Card title="Learn Rule" icon="graduation-cap" href="/skills/learn-rule">
+    Corrections during implementation captured as learnings
+  </Card>
+  <Card title="Parallel Worktrees" icon="code-branch" href="/skills/parallel-worktrees">
+    Research phase uses worktree isolation
+  </Card>
+  <Card title="Context Optimizer" icon="gauge-high" href="/skills/context-optimizer">
+    Subagents keep research phase context clean
+  </Card>
+</CardGroup>
+
+## Configuration
+
+### Enable /develop Command
+
+Create `~/.claude/commands/develop.md`:
+
+```markdown
+---
+description: Multi-phase feature development (Research > Plan > Implement > Review)
+argument-hint: <feature description>
+---
+
+Build this feature using the orchestrate skill:
+
+1. Research phase: Explore codebase, score confidence
+2. Plan phase: Present approach, wait for approval
+3. Implement phase: Execute with quality gates
+4. Review phase: Security and quality check
+5. Commit: Smart commit with conventional format
+
+Feature: $ARGUMENTS
+```
+
+### Create Orchestrator Agent
+
+Create `.claude/agents/orchestrator.md`:
+
+```yaml
+---
+name: orchestrator
+description: Multi-phase feature development with validation gates
+tools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash"]
+skills: ["orchestrate", "pro-workflow"]
+memory: project
+model: opus
+---
+
+[Agent instructions from example above]
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always Research First" icon="magnifying-glass">
+    Even if you think you know the codebase, run research. Patterns change.
+  </Accordion>
+  
+  <Accordion title="Wait for Approval" icon="hand">
+    Never implement without explicit "proceed". Plans often need refinement.
+  </Accordion>
+  
+  <Accordion title="Quality Gates at Checkpoints" icon="shield-check">
+    Every 5 edits: lint, typecheck, tests. Catch issues early.
+  </Accordion>
+  
+  <Accordion title="Review Before Commit" icon="eye">
+    Fresh eyes (reviewer agent) catch what you miss.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### Research Phase Low Confidence (&lt;70)
+
+If confidence is low:
+1. Ask user for more context
+2. Clarify requirements
+3. Identify what's unknown
+4. Research external dependencies
+
+Don't proceed until confidence >70.
+
+### Plan Rejected
+
+If user rejects the plan:
+1. Ask what to change
+2. Go back to research if needed
+3. Revise approach
+4. Present updated plan
+
+Never implement the rejected plan.
+
+### Quality Gates Fail
+
+If lint/typecheck/tests fail:
+1. Fix immediately
+2. Re-run quality gates
+3. Don't accumulate failures
+
+Never proceed to review with failing gates.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Master Pro Workflow" icon="star" href="/skills/pro-workflow">
+    See how orchestrate fits into the complete system
+  </Card>
+  <Card title="Try Smart Commit" icon="code-commit" href="/skills/smart-commit">
+    Commit orchestrated features with quality gates
+  </Card>
+  <Card title="Use Parallel Worktrees" icon="code-branch" href="/skills/parallel-worktrees">
+    Isolate research phase with worktrees
+  </Card>
+  <Card title="View All Skills" icon="puzzle-piece" href="/skills/overview">
+    Explore the complete skill system
+  </Card>
+</CardGroup>

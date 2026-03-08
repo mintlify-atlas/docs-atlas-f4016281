@@ -1,0 +1,469 @@
+---
+title: Command Delegation
+description: Delegate commands to agents for structured execution
+---
+
+Delegation allows commands to hand off work to specialized agents with constrained tools, preloaded skills, and custom models. This is the most powerful pattern in Pro Workflow.
+
+## Why Delegate?
+
+<CardGroup cols={2}>
+  <Card title="Separation of Concerns" icon="layer-group">
+    Commands handle user interaction. Agents handle execution.
+  </Card>
+  <Card title="Tool Constraints" icon="lock">
+    Limit agent capabilities (read-only, no shell access, etc.).
+  </Card>
+  <Card title="Skill Preloading" icon="brain">
+    Agents start with domain knowledge already in context.
+  </Card>
+  <Card title="Model Selection" icon="microchip">
+    Use Opus for planning, Haiku for exploration.
+  </Card>
+</CardGroup>
+
+## The Pattern
+
+```text
+Command (entry point)
+  │
+  ├── Collect arguments
+  ├── Validate inputs
+  └── Delegate to Agent
+        │
+        ├── Preloaded skills
+        ├── Constrained tools
+        ├── Custom model
+        └── Execute workflow
+```
+
+## Basic Delegation
+
+<CodeGroup>
+
+```markdown Command: /develop
+---
+description: Build a feature using multi-phase development
+argument-hint: <feature description>
+---
+
+# Develop Feature
+
+Feature: $ARGUMENTS
+
+Delegate to the **orchestrator agent** to build this feature using the Research > Plan > Implement workflow.
+
+The orchestrator will:
+1. Research the codebase (confidence scoring)
+2. Present a plan for approval
+3. Implement step-by-step
+4. Run quality gates
+```
+
+```markdown Agent: orchestrator.md
+---
+name: orchestrator
+description: Multi-phase development agent. Research > Plan > Implement with validation gates.
+tools: ["Read", "Glob", "Grep", "Bash", "Edit", "Write"]
+skills: ["pro-workflow"]
+model: opus
+memory: project
+---
+
+# Orchestrator Agent
+
+Execute multi-phase development:
+
+## Phase 1: Research
+- Score confidence (0-100)
+- GO/HOLD decision
+
+## Phase 2: Plan
+- Present plan
+- Wait for approval
+
+## Phase 3: Implement
+- Execute plan
+- Quality gates every 5 edits
+```
+
+</CodeGroup>
+
+## Delegation Syntax
+
+Multiple ways to delegate:
+
+<Tabs>
+  <Tab title="Explicit">
+    ```markdown
+    Delegate to the **planner agent** to create an implementation plan.
+    ```
+  </Tab>
+  <Tab title="Implicit">
+    ```markdown
+    Use the planner agent to break down this task.
+    ```
+  </Tab>
+  <Tab title="Conditional">
+    ```markdown
+    If the task touches >5 files, delegate to the orchestrator agent.
+    Otherwise, implement directly.
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  Agent names in delegation must match the `name` field in agent frontmatter.
+</Note>
+
+## Passing Arguments
+
+```markdown
+---
+description: Review code before commit
+argument-hint: [files...]
+---
+
+# Code Review
+
+Files: $ARGUMENTS or all modified files if not specified
+
+Delegate to the **reviewer agent**:
+
+- Review these files: $ARGUMENTS
+- Check for: logic errors, security issues, edge cases
+- Present findings with severity levels
+- Approve or block commit
+```
+
+The agent receives the full command body as context, including expanded `$ARGUMENTS`.
+
+## Multi-Agent Orchestration
+
+### Sequential Delegation
+
+```markdown
+---
+description: Full feature workflow
+argument-hint: <feature>
+---
+
+# Feature Workflow
+
+Feature: $ARGUMENTS
+
+## Step 1: Exploration
+
+Delegate to the **scout agent** (background, worktree isolation):
+- Assess confidence for: $ARGUMENTS
+- Return GO/HOLD verdict
+
+**Wait for scout to complete.**
+
+## Step 2: Planning
+
+If scout gives GO:
+  Delegate to the **planner agent**:
+  - Create implementation plan for: $ARGUMENTS
+  - List all files to change
+  - Present for approval
+
+**Wait for approval.**
+
+## Step 3: Implementation
+
+Delegate to the **orchestrator agent**:
+- Execute the approved plan
+- Quality gates every 5 edits
+- Run full test suite at end
+
+## Step 4: Review
+
+Delegate to the **reviewer agent**:
+- Review all changes
+- Security audit
+- Performance check
+- Approve for commit
+```
+
+### Parallel Delegation
+
+```markdown
+---
+description: Parallel code review
+argument-hint: <files...>
+---
+
+# Parallel Review
+
+Files: $ARGUMENTS
+
+Delegate to multiple reviewer agents in parallel:
+
+- **Reviewer 1**: Security audit of $ARGUMENTS[0:2]
+- **Reviewer 2**: Performance check of $ARGUMENTS[2:4]
+- **Reviewer 3**: Logic review of $ARGUMENTS[4:]
+
+Wait for all reviewers to complete, then synthesize findings.
+```
+
+## Agent Teams
+
+For large tasks, coordinate multiple agents:
+
+```markdown
+---
+description: Build full-stack feature
+argument-hint: <feature>
+---
+
+# Full-Stack Feature
+
+Feature: $ARGUMENTS
+
+Coordinate agent team:
+
+- **Lead** (main session): Coordinate, assign tasks, synthesize results
+- **Frontend Agent**: UI components, styling, client logic
+- **Backend Agent**: API endpoints, database, server logic
+- **Test Agent**: Test coverage, integration tests
+
+Lead assigns subtasks via shared task list.
+Agents work independently and message each other directly.
+Lead reviews and integrates all changes.
+```
+
+<Tip>
+  Enable agent teams with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
+</Tip>
+
+## Conditional Delegation
+
+```markdown
+---
+description: Smart task routing
+argument-hint: <task>
+---
+
+# Smart Router
+
+Task: $ARGUMENTS
+
+Analyze complexity:
+
+- If task is a bug fix:
+  - Delegate to **debugger agent** for systematic investigation
+
+- If task touches >5 files:
+  - Delegate to **orchestrator agent** for multi-phase development
+
+- If task is unclear:
+  - Delegate to **scout agent** for exploration (background)
+  - Wait for confidence score
+  - If score >= 70, delegate to **planner agent**
+  - If score < 70, ask user for clarification
+
+- Otherwise:
+  - Execute directly without delegation
+```
+
+## Agent Selection Matrix
+
+| Task Type | Agent | Why |
+|-----------|-------|-----|
+| Planning | `planner` | Read-only exploration, detailed plans |
+| Review | `reviewer` | Security + quality focus |
+| Exploration | `scout` | Background, worktree isolation, confidence scoring |
+| Multi-phase dev | `orchestrator` | Full tools, Opus model, project memory |
+| Bug investigation | `debugger` | Systematic hypothesis testing |
+| Quick task | None | No delegation overhead |
+
+## Delegation Options
+
+### Background Execution
+
+```markdown
+Delegate to the **scout agent** in the background:
+- Explore codebase for: $ARGUMENTS
+- Don't block the main session
+- Report back when done
+```
+
+The `scout` agent has `background: true` in frontmatter.
+
+### Worktree Isolation
+
+```markdown
+Delegate to the **scout agent** with worktree isolation:
+- Create isolated git worktree
+- Explore safely without interfering with main branch
+- Return findings
+```
+
+The `scout` agent has `isolation: worktree` in frontmatter.
+
+### Model Override
+
+```markdown
+Delegate to the **planner agent** using Opus:
+- Use deep reasoning for complex architecture decisions
+- Create comprehensive plan
+```
+
+The `planner` agent has `model: opus` in frontmatter.
+
+## Return Values
+
+Agents can return structured data:
+
+```markdown
+---
+description: Get confidence score
+---
+
+# Confidence Check
+
+Delegate to **scout agent**:
+- Assess confidence for this task
+- Return score (0-100)
+
+If score >= 70:
+  Proceed with implementation
+Else:
+  Ask user for more context
+```
+
+Parse agent output for decisions.
+
+## Error Handling
+
+```markdown
+---
+description: Safe delegation with fallback
+---
+
+# Safe Task
+
+Try:
+  Delegate to **orchestrator agent**:
+  - Execute task: $ARGUMENTS
+  - If agent fails, report error
+
+Catch:
+  If orchestrator fails:
+    Delegate to **planner agent**:
+    - Create manual plan
+    - User executes plan step-by-step
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Single Responsibility" icon="bullseye">
+    Each agent does one thing well. Commands orchestrate multiple agents.
+  </Card>
+  <Card title="Clear Handoffs" icon="handshake">
+    Pass complete context to agents. Include task description, constraints, and expected output.
+  </Card>
+  <Card title="Wait for Approval" icon="pause">
+    Between phases, wait for user approval. Never auto-proceed through critical gates.
+  </Card>
+  <Card title="Validation Gates" icon="shield">
+    Check agent output before proceeding. Confidence scores, plan quality, etc.
+  </Card>
+</CardGroup>
+
+## Examples
+
+<Accordion title="/develop with Orchestrator">
+
+```markdown
+---
+description: Build feature with multi-phase workflow
+argument-hint: <feature>
+---
+
+# Develop Feature
+
+Feature: $ARGUMENTS
+
+Delegate to **orchestrator agent**:
+
+## Research Phase
+- Explore codebase
+- Find patterns
+- Score confidence
+- Decision: GO/HOLD
+
+## Plan Phase
+- Design solution
+- List files to change
+- Identify risks
+- **Wait for approval**
+
+## Implement Phase
+- Execute plan
+- Quality gates every 5 edits
+- Full test suite at end
+
+## Review Phase
+Delegate to **reviewer agent**:
+- Security audit
+- Logic review
+- Approve for commit
+```
+
+</Accordion>
+
+<Accordion title="/review with Reviewer">
+
+```markdown
+---
+description: Code review before commit
+argument-hint: [files...]
+---
+
+# Code Review
+
+Files: $ARGUMENTS or all modified files
+
+Modified files: !`git diff --name-only`
+
+Delegate to **reviewer agent**:
+
+## Review Checklist
+1. Logic - Does it do what's intended?
+2. Edge Cases - Null, empty, bounds?
+3. Errors - Proper handling?
+4. Security - Injection, auth, secrets?
+5. Performance - O(n^2) loops, memory?
+6. Tests - Coverage adequate?
+
+## Output
+- Critical issues (must fix)
+- High priority (should fix)
+- Medium (nice to fix)
+- Low (suggestions)
+
+## Decision
+- Approve or block commit
+```
+
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Agent Frontmatter" icon="robot" href="/api/agents/frontmatter">
+    Configure agents for delegation
+  </Card>
+  <Card title="Agent Tools" icon="wrench" href="/api/agents/tools">
+    Constrain agent tool access
+  </Card>
+  <Card title="Agent Skills" icon="brain" href="/api/agents/skills">
+    Preload skills into agents
+  </Card>
+  <Card title="Orchestration" icon="sitemap" href="/guides/patterns/orchestration">
+    Command > Agent > Skill patterns
+  </Card>
+</CardGroup>

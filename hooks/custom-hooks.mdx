@@ -1,0 +1,648 @@
+---
+title: "Custom Hooks"
+description: "Write your own hook scripts with matchers, database integration, and advanced patterns"
+icon: "code"
+---
+
+## Writing Custom Hooks
+
+Pro Workflow's hook system is fully extensible. You can write custom scripts to enforce project-specific quality gates, integrate with external tools, or build custom automation.
+
+## Hook Script Anatomy
+
+Every hook script follows this pattern:
+
+<Steps>
+  <Step title="Receive input via stdin">
+    Hook input is a JSON object with event context
+  </Step>
+  
+  <Step title="Process and take action">
+    Parse input, run checks, log output to stderr
+  </Step>
+  
+  <Step title="Pass through input">
+    Echo original input to stdout (required for chaining)
+  </Step>
+  
+  <Step title="Exit with 0">
+    Always exit 0 (non-zero doesn't block execution)
+  </Step>
+</Steps>
+
+## Basic Hook Template
+
+```javascript
+#!/usr/bin/env node
+
+function log(msg) {
+  console.error(msg); // stderr for user-visible output
+}
+
+async function main() {
+  let data = '';
+
+  // 1. Receive input from stdin
+  process.stdin.on('data', chunk => {
+    data += chunk;
+  });
+
+  process.stdin.on('end', () => {
+    try {
+      const input = JSON.parse(data);
+
+      // 2. Process event
+      const tool = input.tool || 'unknown';
+      const toolInput = input.tool_input || {};
+
+      // Your custom logic here
+      if (tool === 'Edit') {
+        log('[CustomHook] Edit detected!');
+      }
+
+      // 3. Pass through original input
+      console.log(data);
+    } catch (err) {
+      // On error, still pass through
+      console.log(data);
+    }
+  });
+}
+
+main().catch(err => {
+  console.error('[CustomHook] Error:', err.message);
+  process.exit(0); // Always exit 0
+});
+```
+
+## Hook Input Schema
+
+### PreToolUse
+
+```json
+{
+  "tool": "Edit",
+  "tool_input": {
+    "file_path": "/path/to/file.ts",
+    "old_string": "...",
+    "new_string": "..."
+  },
+  "session_id": "abc123",
+  "project_dir": "/path/to/project"
+}
+```
+
+### PostToolUse
+
+```json
+{
+  "tool": "Edit",
+  "tool_input": { "file_path": "/path/to/file.ts" },
+  "tool_output": {
+    "success": true,
+    "output": "File edited successfully"
+  },
+  "session_id": "abc123"
+}
+```
+
+### UserPromptSubmit
+
+```json
+{
+  "prompt": "Add user authentication",
+  "session_id": "abc123",
+  "timestamp": 1709856000000
+}
+```
+
+### Stop
+
+```json
+{
+  "assistant_response": "I've added the authentication...",
+  "last_tool": "Edit",
+  "session_id": "abc123"
+}
+```
+
+## Example: Custom Quality Gate
+
+Enforce that all TypeScript files have at least 80% test coverage:
+
+```javascript
+#!/usr/bin/env node
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+function log(msg) {
+  console.error(msg);
+}
+
+async function main() {
+  let data = '';
+  process.stdin.on('data', chunk => { data += chunk; });
+  
+  process.stdin.on('end', () => {
+    try {
+      const input = JSON.parse(data);
+      const filePath = input.tool_input?.file_path;
+
+      if (!filePath || !filePath.endsWith('.ts')) {
+        console.log(data);
+        return;
+      }
+
+      // Check if test file exists
+      const testPath = filePath.replace(/\.ts$/, '.test.ts');
+      if (!fs.existsSync(testPath)) {
+        log(`[CoverageGate] Missing test: ${testPath}`);
+        log('[CoverageGate] Create test file or add [SKIP-TEST] comment');
+      }
+
+      // Run coverage check
+      try {
+        const coverage = execSync(
+          `npx jest --coverage --testPathPattern=${testPath} --silent`,
+          { encoding: 'utf8', cwd: path.dirname(filePath) }
+        );
+
+        const match = coverage.match(/(\d+\.\d+)%/);
+        if (match && parseFloat(match[1]) < 80) {
+          log(`[CoverageGate] Coverage below 80%: ${match[1]}%`);
+        }
+      } catch (e) {
+        // Test failed or no coverage
+      }
+
+      console.log(data);
+    } catch (err) {
+      console.log(data);
+    }
+  });
+}
+
+main().catch(() => process.exit(0));
+```
+
+### Add to hooks.json
+
+```json
+{
+  "PostToolUse": [
+    {
+      "matcher": "tool == 'Edit' && tool_input.file_path matches '\\.ts$'",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/coverage-gate.js\""
+        }
+      ],
+      "description": "Enforce 80% test coverage on TypeScript files"
+    }
+  ]
+}
+```
+
+## Database Integration
+
+Access the SQLite database to store custom metrics:
+
+```javascript
+const path = require('path');
+const fs = require('fs');
+
+function getStore() {
+  const distPath = path.join(__dirname, '..', 'dist', 'db', 'store.js');
+  if (fs.existsSync(distPath)) {
+    const { createStore } = require(distPath);
+    return createStore();
+  }
+  return null;
+}
+
+async function main() {
+  let data = '';
+  process.stdin.on('data', chunk => { data += chunk; });
+
+  process.stdin.on('end', () => {
+    try {
+      const input = JSON.parse(data);
+      const store = getStore();
+
+      if (store) {
+        const sessionId = input.session_id || 'default';
+        
+        // Read session stats
+        const session = store.getSession(sessionId);
+        console.error(`[Custom] Edit count: ${session?.edit_count || 0}`);
+
+        // Update custom counter
+        store.updateSessionCounts(sessionId, 0, 0, 1); // +1 prompt
+
+        store.close();
+      }
+
+      console.log(data);
+    } catch (err) {
+      console.log(data);
+    }
+  });
+}
+
+main().catch(() => process.exit(0));
+```
+
+### Database Methods
+
+<CodeGroup>
+```javascript Session Management
+store.startSession(sessionId, projectName);
+store.getSession(sessionId);
+store.endSession(sessionId);
+store.updateSessionCounts(sessionId, editDelta, correctionDelta, promptDelta);
+store.getRecentSessions(limit);
+```
+
+```javascript Learning Management
+store.addLearning({
+  project: 'my-app',
+  category: 'Testing',
+  rule: 'Always mock external APIs',
+  mistake: 'Real API call in test',
+  correction: 'Use jest.mock()'
+});
+
+const { getRecentLearnings, searchLearnings } = require('../dist/search/fts.js');
+const learnings = getRecentLearnings(store.db, 10, 'my-app');
+const results = searchLearnings(store.db, 'testing', 20);
+```
+</CodeGroup>
+
+## Advanced Matchers
+
+### Regex Patterns
+
+```json
+{
+  "matcher": "tool == 'Bash' && tool_input.command matches 'npm (install|add|i)'",
+  "description": "Detect package installations"
+}
+```
+
+### Multiple Conditions
+
+```json
+{
+  "matcher": "(tool == 'Edit' || tool == 'Write') && tool_input.file_path matches '\\.(tsx?)$'",
+  "description": "TypeScript files only"
+}
+```
+
+### Negation
+
+```json
+{
+  "matcher": "tool == 'Edit' && !(tool_input.file_path matches 'node_modules')",
+  "description": "Exclude node_modules"
+}
+```
+
+## Example: Slack Notification Hook
+
+Notify Slack when commits are pushed:
+
+```javascript
+#!/usr/bin/env node
+const https = require('https');
+
+function sendSlack(message) {
+  const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  const payload = JSON.stringify({ text: message });
+  const url = new URL(webhookUrl);
+
+  const options = {
+    hostname: url.hostname,
+    path: url.pathname,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': payload.length
+    }
+  };
+
+  const req = https.request(options);
+  req.write(payload);
+  req.end();
+}
+
+async function main() {
+  let data = '';
+  process.stdin.on('data', chunk => { data += chunk; });
+
+  process.stdin.on('end', () => {
+    try {
+      const input = JSON.parse(data);
+      const command = input.tool_input?.command || '';
+
+      if (command.includes('git push')) {
+        const project = process.env.CLAUDE_PROJECT_DIR || 'Unknown';
+        sendSlack(`🚀 Pushed to ${project}`);
+      }
+
+      console.log(data);
+    } catch (err) {
+      console.log(data);
+    }
+  });
+}
+
+main().catch(() => process.exit(0));
+```
+
+### Add to hooks.json
+
+```json
+{
+  "PostToolUse": [
+    {
+      "matcher": "tool == 'Bash' && tool_input.command matches 'git push'",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/slack-notify.js\""
+        }
+      ],
+      "description": "Notify Slack on git push"
+    }
+  ]
+}
+```
+
+## Example: AI Slop Detector
+
+Detect and warn about AI-generated code patterns:
+
+```javascript
+#!/usr/bin/env node
+const fs = require('fs');
+
+const SLOP_PATTERNS = [
+  /delve into/i,
+  /it's important to note/i,
+  /it's worth noting/i,
+  /ensure that/i,
+  /leverage/i,
+  /utilize/i,
+  /in order to/i,
+  /at the end of the day/i
+];
+
+function log(msg) {
+  console.error(msg);
+}
+
+async function main() {
+  let data = '';
+  process.stdin.on('data', chunk => { data += chunk; });
+
+  process.stdin.on('end', () => {
+    try {
+      const input = JSON.parse(data);
+      const filePath = input.tool_input?.file_path;
+
+      if (!filePath || !fs.existsSync(filePath)) {
+        console.log(data);
+        return;
+      }
+
+      const content = fs.readFileSync(filePath, 'utf8');
+      const slopFound = [];
+
+      SLOP_PATTERNS.forEach(pattern => {
+        const matches = content.match(pattern);
+        if (matches) {
+          slopFound.push(matches[0]);
+        }
+      });
+
+      if (slopFound.length > 0) {
+        log(`[SlopDetector] AI slop detected in ${filePath}:`);
+        slopFound.forEach(s => log(`  - "${s}"`));
+        log('[SlopDetector] Consider using /deslop skill to clean up');
+      }
+
+      console.log(data);
+    } catch (err) {
+      console.log(data);
+    }
+  });
+}
+
+main().catch(() => process.exit(0));
+```
+
+## Inline Hooks
+
+For simple checks, use inline Node.js:
+
+```json
+{
+  "PreToolUse": [
+    {
+      "matcher": "tool == 'Bash' && tool_input.command matches 'npm publish'",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node -e \"console.error('[ProWorkflow] WARNING: Publishing to npm!'); console.error('[ProWorkflow] Double-check version and changelog'); process.stdin.pipe(process.stdout)\""
+        }
+      ],
+      "description": "Warn before npm publish"
+    }
+  ]
+}
+```
+
+<Warning>
+Inline hooks must **pipe stdin to stdout** to pass through the input JSON. Use `process.stdin.pipe(process.stdout)` at the end.
+</Warning>
+
+## Environment Variables
+
+Hooks have access to these environment variables:
+
+```bash
+CLAUDE_SESSION_ID       # Unique session identifier
+CLAUDE_PROJECT_DIR      # Project root directory
+CLAUDE_PLUGIN_ROOT      # Plugin installation directory
+CWD                     # Current working directory
+```
+
+Use them in scripts:
+
+```javascript
+const sessionId = process.env.CLAUDE_SESSION_ID || 'default';
+const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || __dirname;
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Keep Hooks Fast" icon="bolt">
+    Target &lt;50ms execution time. Hooks run on every tool use, so slow hooks degrade UX.
+  </Card>
+  
+  <Card title="Always Exit 0" icon="check">
+    Non-zero exits don't block execution, but they clutter logs. Exit 0 even on errors.
+  </Card>
+  
+  <Card title="Use stderr for Output" icon="terminal">
+    `console.error()` makes output visible to users. `console.log()` is for JSON passthrough.
+  </Card>
+  
+  <Card title="Handle Missing Database" icon="database">
+    Check if `getStore()` returns null. Fall back to temp files or skip DB features.
+  </Card>
+  
+  <Card title="Prefix Output" icon="tag">
+    Use `[YourHook]` prefix to distinguish your hook from others in logs.
+  </Card>
+  
+  <Card title="Pass Through Input" icon="arrows-rotate">
+    Always `console.log(data)` at the end, even on errors. This ensures hook chaining works.
+  </Card>
+</CardGroup>
+
+## Testing Hooks
+
+### Manual Test
+
+```bash
+# Create test input
+echo '{"tool":"Edit","tool_input":{"file_path":"test.ts"}}' | \
+  node scripts/your-hook.js
+```
+
+### Integration Test
+
+Add hook to `hooks.json`, then trigger the event:
+
+```bash
+# Start Claude Code
+claude
+
+# Trigger PreToolUse
+> Edit a file
+
+# Check output in terminal for [YourHook] prefix
+```
+
+## Hook Recipe: Conventional Commit Enforcer
+
+```javascript
+#!/usr/bin/env node
+const CONVENTIONAL_PATTERN = /^(feat|fix|docs|style|refactor|perf|test|chore)(\(.+\))?: .{10,}/;
+
+function log(msg) {
+  console.error(msg);
+}
+
+async function main() {
+  let data = '';
+  process.stdin.on('data', chunk => { data += chunk; });
+
+  process.stdin.on('end', () => {
+    try {
+      const input = JSON.parse(data);
+      const command = input.tool_input?.command || '';
+
+      const match = command.match(/git commit.*-m ['"](.+?)['"]/);      
+      if (match) {
+        const message = match[1];
+        
+        if (!CONVENTIONAL_PATTERN.test(message)) {
+          log('[CommitGate] ❌ Commit message not conventional format');
+          log('[CommitGate] Expected: type(scope): description');
+          log('[CommitGate] Example: feat(auth): add JWT token validation');
+          log('[CommitGate] Types: feat, fix, docs, style, refactor, perf, test, chore');
+        } else {
+          log('[CommitGate] ✓ Conventional commit format');
+        }
+      }
+
+      console.log(data);
+    } catch (err) {
+      console.log(data);
+    }
+  });
+}
+
+main().catch(() => process.exit(0));
+```
+
+Add to `hooks.json`:
+
+```json
+{
+  "PreToolUse": [
+    {
+      "matcher": "tool == 'Bash' && tool_input.command matches 'git commit'",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/commit-gate.js\""
+        }
+      ],
+      "description": "Enforce conventional commit format"
+    }
+  ]
+}
+```
+
+## Troubleshooting
+
+### Hook Not Firing
+
+1. Check matcher syntax in `hooks.json`
+2. Verify tool name matches exactly (case-sensitive)
+3. Test regex patterns with online tools
+4. Check file extension matching: use `\\\\` for escaping in JSON
+
+### Hook Output Not Visible
+
+1. Ensure `console.error()` (not `console.log()`)
+2. Check that script is executable: `chmod +x scripts/your-hook.js`
+3. Verify shebang line: `#!/usr/bin/env node`
+
+### Database Errors
+
+1. Check if `dist/db/store.js` exists (run `npm run build`)
+2. Verify `~/.pro-workflow/data.db` is not corrupted
+3. Add null checks: `if (!store) return;`
+
+### Performance Issues
+
+1. Profile with `time`: `time node scripts/your-hook.js < test-input.json`
+2. Avoid synchronous file operations on large files
+3. Cache results in temp files instead of recalculating
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Overview" href="/hooks/overview" icon="webhook">
+    Complete reference of all 18 hook events
+  </Card>
+  <Card title="Hook Lifecycle" href="/hooks/lifecycle" icon="diagram-project">
+    Visual guide to hook execution flow and timing
+  </Card>
+</CardGroup>
+
+---
+
+<Note>
+Share your custom hooks in the [Pro Workflow discussions](https://github.com/rohitg00/pro-workflow/discussions) to help the community build better workflows.
+</Note>

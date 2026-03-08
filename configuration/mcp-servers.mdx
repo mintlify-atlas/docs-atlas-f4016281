@@ -1,0 +1,505 @@
+---
+title: MCP Servers
+description: Configure Model Context Protocol servers for enhanced Claude Code capabilities
+---
+
+## Overview
+
+MCP (Model Context Protocol) servers extend Claude Code with external integrations like live documentation, browser automation, database access, and more. Configure servers at user, project, or agent scope.
+
+## Configuration Scopes
+
+<CardGroup cols={3}>
+  <Card title="User Scope" icon="user">
+    `~/.claude.json` - Personal MCP servers available in all projects
+  </Card>
+  <Card title="Project Scope" icon="folder">
+    `.mcp.json` - Team-shared servers for the project (requires approval)
+  </Card>
+  <Card title="Agent Scope" icon="robot">
+    Agent frontmatter - Servers available only to specific agents
+  </Card>
+</CardGroup>
+
+## Basic Configuration
+
+<CodeGroup>
+```json .claude/settings.json
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"],
+      "_comment": "Live documentation lookup. Eliminates outdated API guessing."
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-playwright"],
+      "_comment": "Browser automation and E2E testing. Most token-efficient browser MCP."
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      },
+      "_comment": "PRs, issues, code search. Essential for any GitHub-based project."
+    }
+  }
+}
+```
+
+```json .mcp.json (project)
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-playwright"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      }
+    }
+  }
+}
+```
+</CodeGroup>
+
+## Server Definition Structure
+
+<ParamField path="command" type="string" required>
+  Executable to run (e.g., `npx`, `node`, `python`, absolute path)
+</ParamField>
+
+<ParamField path="args" type="string[]" required>
+  Command-line arguments passed to the executable
+</ParamField>
+
+<ParamField path="env" type="object">
+  Environment variables for the MCP server process
+  
+  Supports variable substitution: `${VAR_NAME}` reads from shell environment
+</ParamField>
+
+<ParamField path="_comment" type="string">
+  Human-readable description (ignored by parser)
+</ParamField>
+
+## Approval Settings
+
+Control how project MCP servers are authorized:
+
+<ParamField path="enableAllProjectMcpServers" type="boolean" default="false">
+  Auto-approve all servers from `.mcp.json`
+</ParamField>
+
+<ParamField path="enabledMcpjsonServers" type="string[]">
+  Allowlist of approved project MCP server names
+</ParamField>
+
+<ParamField path="disabledMcpjsonServers" type="string[]">
+  Blocklist of denied project MCP server names
+</ParamField>
+
+<CodeGroup>
+```json Auto-approve all
+{
+  "enableAllProjectMcpServers": true
+}
+```
+
+```json Selective approval
+{
+  "enabledMcpjsonServers": ["context7", "github"]
+}
+```
+
+```json Block specific servers
+{
+  "disabledMcpjsonServers": ["unused-server"]
+}
+```
+</CodeGroup>
+
+<Warning>
+Project MCP servers (`.mcp.json`) require explicit approval for security. User servers (`~/.claude.json`) are automatically trusted.
+</Warning>
+
+## Permission Rules for MCP
+
+Control MCP tool invocation using permission rules:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "MCP(github:*)",
+      "MCP(context7:*)",
+      "MCP(playwright:navigate)",
+      "MCP(playwright:screenshot)"
+    ],
+    "ask": [
+      "MCP(github:push_files)",
+      "MCP(playwright:click)"
+    ],
+    "deny": [
+      "MCP(dangerous-server:*)"
+    ]
+  }
+}
+```
+
+**Pattern**: `MCP(server-name:tool-name)`
+
+- `MCP(github:*)` - All tools from github server
+- `MCP(*:*)` - All MCP tools from any server
+- `MCP(playwright:navigate)` - Only the navigate tool
+
+## Recommended MCP Servers
+
+### Daily Use
+
+Servers recommended for everyday development:
+
+<AccordionGroup>
+  <Accordion title="context7 - Live Documentation">
+    **Package**: `@upstash/context7-mcp@latest`
+    
+    Query live documentation from 100+ sources (React, Next.js, TypeScript, etc.) to eliminate API guessing.
+    
+    ```json
+    {
+      "context7": {
+        "command": "npx",
+        "args": ["-y", "@upstash/context7-mcp@latest"]
+      }
+    }
+    ```
+    
+    **Use cases**:
+    - Check latest API signatures
+    - Verify deprecations
+    - Find correct import paths
+  </Accordion>
+  
+  <Accordion title="playwright - Browser Automation">
+    **Package**: `@anthropic/mcp-playwright`
+    
+    E2E testing and browser automation. Token-efficient compared to other browser MCPs (~13.7k tokens avg).
+    
+    ```json
+    {
+      "playwright": {
+        "command": "npx",
+        "args": ["-y", "@anthropic/mcp-playwright"]
+      }
+    }
+    ```
+    
+    **Use cases**:
+    - Write E2E tests
+    - Debug UI issues
+    - Automate browser tasks
+  </Accordion>
+  
+  <Accordion title="github - Repository Operations">
+    **Package**: `@modelcontextprotocol/server-github`
+    
+    PRs, issues, code search, and repository management.
+    
+    ```json
+    {
+      "github": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-github"],
+        "env": {
+          "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+        }
+      }
+    }
+    ```
+    
+    **Use cases**:
+    - Create and manage PRs
+    - Search across repositories
+    - Update issues and comments
+    
+    **Setup**: Create a GitHub personal access token with `repo` scope and set `GITHUB_TOKEN` environment variable.
+  </Accordion>
+</AccordionGroup>
+
+### Add When Needed
+
+Specialized servers for specific use cases:
+
+| Server | Package | Use Case |
+|--------|---------|----------|
+| **supabase** | `@upstash/supabase-mcp` | Database operations (when using Supabase) |
+| **linear** | `@linear/mcp-server` | Issue tracking (when using Linear) |
+| **slack** | `@modelcontextprotocol/server-slack` | Team notifications (when using Slack) |
+| **filesystem** | `@modelcontextprotocol/server-filesystem` | Advanced file operations |
+| **postgres** | `@modelcontextprotocol/server-postgres` | Direct PostgreSQL access |
+| **sqlite** | `@modelcontextprotocol/server-sqlite` | SQLite database operations |
+
+<Note>
+**Wisdom**: Start with 3 MCPs (context7, playwright, github). Add only when you hit a concrete need. Most developers who start with 10+ end up using 3-4 daily.
+</Note>
+
+## Agent-Specific MCP Servers
+
+Configure MCP servers that only specific agents can access:
+
+```yaml
+---
+name: e2e-tester
+description: Write and run end-to-end tests
+tools: ["Read", "Write", "Bash", "MCP"]
+mcpServers:
+  playwright:
+    command: npx
+    args: ["-y", "@anthropic/mcp-playwright"]
+---
+
+You are an E2E testing specialist. Use Playwright MCP to automate browser tests.
+```
+
+<Accordion title="Why agent-specific servers?">
+- **Performance**: Only load heavy MCPs when needed
+- **Security**: Restrict sensitive operations to specific agents
+- **Context efficiency**: Avoid polluting general agent context with specialized tools
+</Accordion>
+
+## Environment Variables
+
+MCP servers often require credentials and configuration:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": {
+        "POSTGRES_CONNECTION_STRING": "${DATABASE_URL}"
+      }
+    }
+  }
+}
+```
+
+**Variable substitution**: `${VAR_NAME}` reads from your shell environment.
+
+<Warning>
+Never hardcode credentials in `.mcp.json` or `settings.json`. Always use environment variables and keep credentials in your shell profile or `.env` files (gitignored).
+</Warning>
+
+## Custom MCP Servers
+
+Run your own MCP server implementation:
+
+<CodeGroup>
+```json Node.js server
+{
+  "mcpServers": {
+    "custom-api": {
+      "command": "node",
+      "args": ["/absolute/path/to/server.js"],
+      "env": {
+        "API_KEY": "${CUSTOM_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+```json Python server
+{
+  "mcpServers": {
+    "ml-tools": {
+      "command": "python",
+      "args": ["-m", "my_mcp_server"],
+      "env": {
+        "MODEL_PATH": "/path/to/model"
+      }
+    }
+  }
+}
+```
+
+```json Binary executable
+{
+  "mcpServers": {
+    "native-tool": {
+      "command": "/usr/local/bin/my-mcp-server",
+      "args": ["--port", "8080"]
+    }
+  }
+}
+```
+</CodeGroup>
+
+## Debugging MCP Servers
+
+If an MCP server isn't working:
+
+<Steps>
+  <Step title="Check server availability">
+    Test the command manually:
+    ```bash
+    npx -y @upstash/context7-mcp@latest
+    ```
+  </Step>
+  
+  <Step title="Verify environment variables">
+    Ensure required env vars are set:
+    ```bash
+    echo $GITHUB_TOKEN
+    echo $DATABASE_URL
+    ```
+  </Step>
+  
+  <Step title="Review permissions">
+    Check if MCP tools are allowed in your settings:
+    ```json
+    {
+      "permissions": {
+        "allow": ["MCP(server-name:*)"]
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Check approval status">
+    For project servers, verify approval settings:
+    ```json
+    {
+      "enabledMcpjsonServers": ["server-name"]
+    }
+    ```
+  </Step>
+  
+  <Step title="Use /doctor">
+    Run the diagnostic command:
+    ```bash
+    /doctor
+    ```
+  </Step>
+</Steps>
+
+## Performance Considerations
+
+### Token Usage
+
+MCP tools contribute to context usage:
+
+| Server | Avg Token Impact | Notes |
+|--------|-----------------|-------|
+| context7 | Low (~2-5k) | Fetches targeted docs |
+| playwright | Medium (~14k) | Includes browser state |
+| github | Medium (~10-15k) | Large API responses |
+| filesystem | Low (~1-3k) | Depends on file size |
+| postgres | High (~20k+) | Query results can be large |
+
+<Accordion title="Minimize token usage">
+- Request only needed data (use filters, limits)
+- Use context7 instead of loading entire docs
+- Clear context with `/compact` after heavy MCP operations
+- Consider agent-specific MCPs to isolate heavy tools
+</Accordion>
+
+### Startup Time
+
+MCP servers add initialization overhead:
+
+- **npx servers**: ~2-5 seconds (download + start)
+- **local binaries**: ~100-500ms (start only)
+- **Agent-specific**: Only pay cost when agent spawns
+
+## Example Configurations
+
+<CodeGroup>
+```json Full-stack web development
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-playwright"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      }
+    }
+  },
+  "enableAllProjectMcpServers": false,
+  "enabledMcpjsonServers": ["context7", "playwright", "github"]
+}
+```
+
+```json Data engineering
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": {
+        "POSTGRES_CONNECTION_STRING": "${DATABASE_URL}"
+      }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+      "env": {
+        "ALLOWED_PATHS": "/data,/home/user/datasets"
+      }
+    }
+  }
+}
+```
+
+```json Minimal setup
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"]
+    }
+  }
+}
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Settings" icon="gear" href="/configuration/settings">
+    Configure core Claude Code behavior
+  </Card>
+  <Card title="Permissions" icon="lock" href="/configuration/settings#permission-rules">
+    Fine-tune MCP tool access control
+  </Card>
+  <Card title="Agent Configuration" icon="robot" href="/agents/configuration">
+    Set up agent-specific MCP servers
+  </Card>
+</CardGroup>

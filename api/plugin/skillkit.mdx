@@ -1,0 +1,413 @@
+---
+title: SkillKit Integration
+description: Translate Pro Workflow skills to any AI coding agent
+---
+
+SkillKit is a cross-agent skill translator that converts Pro Workflow skills to formats compatible with Claude Code, Cursor, Codex, Gemini CLI, and 32+ other agents.
+
+## What is SkillKit?
+
+SkillKit reads skill definitions in a standard format and translates them to agent-specific configurations:
+
+```bash
+skillkit translate pro-workflow --agent cursor
+skillkit translate pro-workflow --agent codex
+skillkit translate pro-workflow --agent gemini-cli
+```
+
+<Info>
+  Pro Workflow skills are designed to be SkillKit-compatible out of the box.
+</Info>
+
+## Installation
+
+<Tabs>
+  <Tab title="Global">
+    ```bash
+    npm install -g skillkit
+    ```
+  </Tab>
+  <Tab title="Project">
+    ```bash
+    npm install --save-dev skillkit
+    ```
+  </Tab>
+  <Tab title="npx">
+    ```bash
+    npx skillkit translate pro-workflow --agent cursor
+    ```
+  </Tab>
+</Tabs>
+
+## Translating Pro Workflow
+
+### To Cursor
+
+```bash
+cd your-project
+skillkit translate pro-workflow --agent cursor
+```
+
+**Output:**
+- `.cursor/rules/` — Translated skills as `.mdc` rules
+- `.cursor/agents/` — Agent instructions
+- `.cursor/skills/` — Skill references
+
+### To Codex
+
+```bash
+skillkit translate pro-workflow --agent codex
+```
+
+**Output:**
+- `.codex/context/` — Skills as context files
+- `.codex/rules.md` — Combined rules
+
+### To Gemini CLI
+
+```bash
+skillkit translate pro-workflow --agent gemini-cli
+```
+
+**Output:**
+- `.gemini/skills/` — Skill definitions
+- `.gemini/system.md` — System prompt with Pro Workflow patterns
+
+## Skill Format
+
+Pro Workflow skills use a standard format compatible with SkillKit:
+
+<CodeGroup>
+
+```markdown Standard Format
+---
+name: skill-name
+description: What this skill does
+user-invocable: true
+allowed-tools: ["Read", "Bash"]
+model: opus
+context: fork
+---
+
+# Skill Name
+
+Detailed instructions here.
+
+## Workflow
+
+1. Step one
+2. Step two
+
+## Output
+
+Expected output format.
+```
+
+</CodeGroup>
+
+### Frontmatter Fields
+
+<ParamField path="name" type="string" required>
+  Skill identifier. Used for invocation (`/skill-name`).
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  Short description. Used for skill discovery and agent invocation.
+</ParamField>
+
+<ParamField path="user-invocable" type="boolean" default="true">
+  Whether the skill can be invoked by users directly.
+</ParamField>
+
+<ParamField path="allowed-tools" type="string[]">
+  Tool whitelist for skill execution. Example: `["Read", "Glob", "Grep"]`.
+</ParamField>
+
+<ParamField path="model" type="string">
+  Model override. Example: `"opus"`, `"sonnet"`, `"haiku"`.
+</ParamField>
+
+<ParamField path="context" type="string">
+  Execution context. `fork` for isolated subagent execution.
+</ParamField>
+
+<ParamField path="agent" type="string">
+  Delegate to a specific agent. Example: `"planner"`, `"reviewer"`.
+</ParamField>
+
+## Translation Mappings
+
+<Accordion title="Claude Code → Cursor">
+
+| Claude Code | Cursor |
+|-------------|--------|
+| `/command` | Custom scripts in `.cursor/tasks/` |
+| Agent frontmatter | `.mdc` rules in `.cursor/agents/` |
+| Skill frontmatter | `.mdc` rules in `.cursor/skills/` |
+| Hooks | Git hooks in `.git/hooks/` |
+| `allowed-tools` | Ignored (no tool restrictions) |
+| `context: fork` | Separate rule file |
+
+</Accordion>
+
+<Accordion title="Claude Code → Codex">
+
+| Claude Code | Codex |
+|-------------|-------|
+| `/command` | Context files in `.codex/context/` |
+| Agent frontmatter | Combined in `.codex/rules.md` |
+| Skill frontmatter | Context files in `.codex/skills/` |
+| Hooks | Not supported |
+| `allowed-tools` | Not supported |
+| `context: fork` | Separate context file |
+
+</Accordion>
+
+<Accordion title="Claude Code → Gemini CLI">
+
+| Claude Code | Gemini CLI |
+|-------------|------------|
+| `/command` | Shell functions in `.gemini/commands.sh` |
+| Agent frontmatter | System prompt sections |
+| Skill frontmatter | Skill files in `.gemini/skills/` |
+| Hooks | Not supported |
+| `allowed-tools` | Not supported |
+| `context: fork` | Separate skill file |
+
+</Accordion>
+
+## Custom Translation
+
+Create a `skillkit.config.js` to customize translation:
+
+```javascript
+module.exports = {
+  agent: 'cursor',
+  input: './skills/',
+  output: './.cursor/',
+  transform: {
+    // Remove frontmatter for Cursor
+    frontmatter: false,
+    
+    // Flatten directory structure
+    flatten: true,
+    
+    // Rename files
+    rename: (name) => `${name}.mdc`
+  },
+  exclude: ['node_modules', 'dist']
+};
+```
+
+Run with config:
+
+```bash
+skillkit translate --config skillkit.config.js
+```
+
+## Supported Agents
+
+SkillKit supports 32+ agents. Pro Workflow is tested with:
+
+<CardGroup cols={3}>
+  <Card title="Claude Code" icon="terminal">
+    Native support (no translation needed)
+  </Card>
+  <Card title="Cursor" icon="mouse-pointer">
+    Via `.mdc` rules
+  </Card>
+  <Card title="Codex" icon="code">
+    Via context files
+  </Card>
+  <Card title="Gemini CLI" icon="star">
+    Via system prompt
+  </Card>
+  <Card title="Aider" icon="comment">
+    Via `.aider.md`
+  </Card>
+  <Card title="GitHub Copilot" icon="github">
+    Via `.github/copilot-instructions.md`
+  </Card>
+</CardGroup>
+
+Full list: https://github.com/skillkit/skillkit#supported-agents
+
+## Verifying Translation
+
+After translation, verify output:
+
+<CodeGroup>
+
+```bash Check Cursor Output
+ls .cursor/rules/
+ls .cursor/skills/
+cat .cursor/rules/pro-workflow.mdc
+```
+
+```bash Check Codex Output
+ls .codex/context/
+cat .codex/rules.md
+```
+
+```bash Check Gemini Output
+ls .gemini/skills/
+cat .gemini/system.md
+```
+
+</CodeGroup>
+
+## Database Compatibility
+
+The Pro Workflow database works across all agents:
+
+```typescript
+// Same API, any agent
+import { createStore } from 'pro-workflow';
+
+const store = createStore();
+const results = store.getAllLearnings();
+store.close();
+```
+
+<Tip>
+  Use `~/.pro-workflow/data.db` as a shared database across all agents.
+</Tip>
+
+## Bidirectional Sync
+
+SkillKit supports bidirectional translation:
+
+```bash
+# Cursor → Claude Code
+skillkit translate .cursor/rules/ --agent claude-code --output .claude/
+
+# Codex → Cursor
+skillkit translate .codex/context/ --agent cursor --output .cursor/
+```
+
+## Advanced Usage
+
+### Selective Translation
+
+```bash
+# Translate only specific skills
+skillkit translate pro-workflow/skills/wrap-up --agent cursor
+skillkit translate pro-workflow/skills/orchestrate --agent codex
+```
+
+### Dry Run
+
+```bash
+# Preview translation without writing files
+skillkit translate pro-workflow --agent cursor --dry-run
+```
+
+### Watch Mode
+
+```bash
+# Auto-translate on file changes
+skillkit translate pro-workflow --agent cursor --watch
+```
+
+## Creating Custom Skills
+
+Write skills in Pro Workflow format for automatic translation:
+
+<Steps>
+  <Step title="Create skill directory">
+    ```bash
+    mkdir -p skills/my-skill
+    ```
+  </Step>
+  <Step title="Add SKILL.md">
+    ```markdown
+    ---
+    name: my-skill
+    description: Does something useful
+    ---
+    
+    # My Skill
+    
+    Instructions here.
+    ```
+  </Step>
+  <Step title="Translate">
+    ```bash
+    skillkit translate skills/my-skill --agent cursor
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Translation fails">
+    Check that your skill has valid frontmatter:
+    
+    ```bash
+    skillkit validate skills/my-skill/SKILL.md
+    ```
+  </Accordion>
+  
+  <Accordion title="Output files not created">
+    Ensure output directory exists:
+    
+    ```bash
+    mkdir -p .cursor/rules
+    skillkit translate pro-workflow --agent cursor --output .cursor/rules
+    ```
+  </Accordion>
+  
+  <Accordion title="Unsupported agent">
+    Check supported agents:
+    
+    ```bash
+    skillkit list-agents
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## API Reference
+
+<ResponseField name="skillkit.translate" type="function">
+  Translate skills to another agent format.
+  
+  **Parameters:**
+  - `source` (string): Path to skills directory
+  - `agent` (string): Target agent name
+  - `options` (object): Translation options
+  
+  **Returns:** `Promise<TranslationResult>`
+</ResponseField>
+
+<ResponseField name="skillkit.validate" type="function">
+  Validate skill frontmatter and structure.
+  
+  **Parameters:**
+  - `skillPath` (string): Path to SKILL.md
+  
+  **Returns:** `Promise<ValidationResult>`
+</ResponseField>
+
+<ResponseField name="skillkit.listAgents" type="function">
+  List all supported agents.
+  
+  **Returns:** `Promise<string[]>`
+</ResponseField>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Cursor Plugin" icon="mouse-pointer" href="/api/plugin/cursor">
+    Use translated skills in Cursor
+  </Card>
+  <Card title="Skills API" icon="sparkles" href="/api/skills/frontmatter">
+    Learn skill frontmatter syntax
+  </Card>
+  <Card title="Custom Skills" icon="pen" href="/guides/skills/creating">
+    Build your own skills
+  </Card>
+  <Card title="SkillKit Docs" icon="book" href="https://github.com/skillkit/skillkit">
+    Full SkillKit documentation
+  </Card>
+</CardGroup>

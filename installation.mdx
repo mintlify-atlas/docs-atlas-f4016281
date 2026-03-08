@@ -1,0 +1,539 @@
+---
+title: Installation
+description: Complete installation guide for all environments
+---
+
+Pro Workflow works with Claude Code, Cursor, and 32+ AI coding agents via SkillKit. Choose the installation method that matches your environment.
+
+## Cursor Installation
+
+<Steps>
+  <Step title="Add Plugin">
+    The fastest way to install in Cursor:
+
+    ```bash
+    /add-plugin pro-workflow
+    ```
+
+    This command automatically installs:
+    - **11 skills** - Core workflow patterns, smart-commit, wrap-up, learn-rule, context-optimizer, orchestrate, and more
+    - **5 agents** - planner, reviewer, scout, orchestrator, debugger
+    - **6 rules** - quality-gates, atomic-commits, context-discipline, self-correction, no-debug-statements, communication-style
+  </Step>
+
+  <Step title="Verify Installation">
+    Check that the plugin loaded successfully:
+
+    ```bash
+    /doctor
+    ```
+
+    You should see:
+    ```text
+    Pro-Workflow Health Check
+      Installation:  OK
+      Rules:         6 active
+      Skills:        11 loaded
+      Agents:        5 available
+    ```
+  </Step>
+
+  <Step title="Test a Skill">
+    Try the self-correction pattern:
+
+    ```text
+    You: Make a deliberate mistake
+    AI: [makes mistake]
+    You: That's wrong, remember this
+    AI: [proposes LEARN rule for approval]
+    ```
+  </Step>
+</Steps>
+
+<Note>
+Cursor users get equivalent hook behavior through `.mdc` rules in the `rules/` directory. All patterns work the same, just enforced via Cursor's rule system instead of hooks.
+</Note>
+
+---
+
+## Claude Code Installation
+
+### Method 1: Plugin Marketplace (Recommended)
+
+<Steps>
+  <Step title="Add from Marketplace">
+    ```bash
+    /plugin marketplace add rohitg00/pro-workflow
+    /plugin install pro-workflow@pro-workflow
+    ```
+
+    <Check>
+    All commands are now available with the `/pro-workflow:` prefix.
+    </Check>
+  </Step>
+
+  <Step title="Build with SQLite Support">
+    For searchable learnings with full-text search:
+
+    ```bash
+    cd ~/.claude/plugins/*/pro-workflow
+    npm install && npm run build
+    ```
+
+    This creates the SQLite database at `~/.pro-workflow/data.db` with FTS5 indexing.
+  </Step>
+
+  <Step title="Test Commands">
+    Commands work with short aliases:
+
+    ```bash
+    /develop add authentication
+    /doctor
+    /wrap-up
+    /search "testing patterns"
+    ```
+  </Step>
+</Steps>
+
+### Method 2: Load Directly
+
+```bash
+claude --plugin-dir /path/to/pro-workflow
+```
+
+Use this method when:
+- You want to modify the plugin locally
+- You're developing custom commands or agents
+- You need to test changes before publishing
+
+### Command Reference
+
+| Command | Alias | Description |
+|---------|-------|-------------|
+| `/pro-workflow:wrap-up` | `/wrap-up` | End-of-session checklist |
+| `/pro-workflow:learn-rule` | `/learn-rule` | Extract correction to memory |
+| `/pro-workflow:commit` | `/commit` | Smart commit with quality gates |
+| `/pro-workflow:develop` | `/develop` | Multi-phase feature build |
+| `/pro-workflow:doctor` | `/doctor` | Health check for setup |
+| `/pro-workflow:insights` | `/insights` | Session analytics and heatmap |
+| `/pro-workflow:replay` | `/replay` | Surface past learnings |
+| `/pro-workflow:handoff` | `/handoff` | Generate session handoff |
+| `/pro-workflow:search` | `/search` | Search learnings by keyword |
+| `/pro-workflow:list` | `/list` | List all stored learnings |
+
+<Tip>
+After plugin install, short forms like `/develop` work directly. No need to use the full prefix.
+</Tip>
+
+---
+
+## Manual Installation (Any Agent)
+
+For agents without plugin support, or if you prefer manual setup:
+
+<Steps>
+  <Step title="Clone Repository">
+    ```bash
+    git clone https://github.com/rohitg00/pro-workflow.git /tmp/pw
+    ```
+  </Step>
+
+  <Step title="Copy Templates">
+    ```bash
+    cp -r /tmp/pw/templates/split-claude-md/* ./.claude/
+    ```
+
+    This creates a modular memory structure:
+    ```text
+    .claude/
+    ├── CLAUDE.md        # Entry point
+    ├── AGENTS.md        # Workflow rules
+    ├── SOUL.md          # Style preferences
+    └── LEARNED.md       # Auto-populated corrections
+    ```
+  </Step>
+
+  <Step title="Optional: Copy Commands">
+    ```bash
+    cp -r /tmp/pw/commands/* ~/.claude/commands/
+    ```
+
+    Makes commands like `/wrap-up` and `/develop` available.
+  </Step>
+</Steps>
+
+### Minimal Setup
+
+If you just want the core patterns, add this to your `CLAUDE.md`:
+
+```markdown
+## Pro Workflow
+
+### Self-Correction
+When corrected, propose rule → add to LEARNED after approval.
+
+### Planning
+Multi-file: plan first, wait for "proceed".
+
+### Quality
+After edits: lint, typecheck, test.
+
+### LEARNED
+```
+
+This gives you the self-correction loop without any dependencies.
+
+---
+
+## SkillKit Installation (32+ Agents)
+
+Use [SkillKit](https://agenstskills.com) to install Pro Workflow on any of 32+ supported agents:
+
+<Steps>
+  <Step title="Install Pro Workflow">
+    ```bash
+    npx skillkit install pro-workflow
+    ```
+  </Step>
+
+  <Step title="Translate for Your Agent">
+    <CodeGroup>
+    ```bash Cursor
+    npx skillkit translate pro-workflow --agent cursor
+    ```
+
+    ```bash Codex CLI
+    npx skillkit translate pro-workflow --agent codex
+    ```
+
+    ```bash Gemini CLI
+    npx skillkit translate pro-workflow --agent gemini-cli
+    ```
+
+    ```bash Windsurf
+    npx skillkit translate pro-workflow --agent windsurf
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Verify">
+    Check that skills are available in your agent:
+
+    ```bash
+    # Agent-specific verification
+    # See your agent's docs for skill listing commands
+    ```
+  </Step>
+</Steps>
+
+<Note>
+SkillKit translates Pro Workflow patterns into the native format for each agent. All core patterns (self-correction, quality gates, orchestration) work the same way.
+</Note>
+
+### Supported Agents
+
+Pro Workflow works across these agents via SkillKit:
+- Claude Code
+- Cursor
+- Codex CLI
+- Gemini CLI
+- Windsurf
+- 27+ more agents
+
+See [Cross-Agent Workflows](/guides/cross-agent-workflows) for configuration mapping.
+
+---
+
+## Configuration
+
+### Settings Example
+
+Pro Workflow includes a production-ready settings template at `settings.example.json`:
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(curl * | bash)",
+      "Edit(/node_modules/**)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(docker *)",
+      "Bash(npm publish *)"
+    ],
+    "allow": [
+      "Read", "Glob", "Grep", "Edit", "Write",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "MCP(github:*)",
+      "Task(*)",
+      "Agent(*)"
+    ]
+  },
+  "outputStyle": "Explanatory",
+  "statusLine": "model branch tokens",
+  "plansDirectory": ".claude/plans",
+  "env": {
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80"
+  },
+  "spinnerVerbs": ["Thinking", "Analyzing", "Exploring"]
+}
+```
+
+<Accordion title="Full Settings Reference">
+  **Permission Rules**
+  - `deny` - Block dangerous operations (force delete, pipe to bash)
+  - `ask` - Require approval (git push, docker, npm publish)
+  - `allow` - Auto-approve (read operations, git status, tests)
+
+  **Output Configuration**
+  - `outputStyle` - "Minimal", "Explanatory", or "Verbose"
+  - `statusLine` - "model branch tokens" shows context in status
+  - `attribution` - Commit message and PR description attribution
+
+  **Context Management**
+  - `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` - Compact before 95% (default: 50-80%)
+  - `plansDirectory` - Where to store plan files
+
+  See [Settings Guide](/guides/settings-guide) for all options.
+</Accordion>
+
+### MCP Configuration
+
+Pro Workflow includes curated MCP recommendations at `mcp-config.example.json`:
+
+<CardGroup cols={3}>
+  <Card title="context7" icon="book">
+    Live documentation lookup - essential for API references
+  </Card>
+  <Card title="playwright" icon="browser">
+    Browser automation - most token-efficient
+  </Card>
+  <Card title="GitHub" icon="github">
+    PRs, issues, code search - integrate with workflows
+  </Card>
+</CardGroup>
+
+<Warning>
+**Rule: Start with 3 MCPs. Add only for concrete needs.**
+
+Each MCP adds to context consumption. Pro Workflow recommends:
+- Keep < 10 MCP servers enabled
+- Keep < 80 total tools
+- Disable unused servers via `disabledMcpjsonServers` in settings
+</Warning>
+
+---
+
+## Database Setup (Claude Code)
+
+Pro Workflow stores learnings in SQLite with FTS5 full-text search:
+
+```text
+~/.pro-workflow/
+└── data.db    # SQLite database with learnings and sessions
+```
+
+### Initialize Database
+
+```bash
+cd ~/.claude/plugins/*/pro-workflow
+npm run db:init
+```
+
+### Search Learnings
+
+```bash
+/search testing           # Find all testing-related learnings
+/search "file paths"      # Exact phrase search
+/list                     # List all learnings
+```
+
+<Tip>
+The database automatically captures:
+- LEARNED rules from self-correction
+- Session stats (edits, corrections, quality gate runs)
+- Searchable learning index for quick retrieval
+</Tip>
+
+---
+
+## Hooks Setup (Claude Code)
+
+Pro Workflow includes 18 hook events for automated workflow enforcement:
+
+```bash
+# Copy hooks to your settings
+cp ~/skills/pro-workflow/hooks/hooks.json ~/.claude/settings.local.json
+```
+
+### Hook Events
+
+<AccordionGroup>
+  <Accordion title="PreToolUse Hooks">
+    | Trigger | Action |
+    |---------|--------|
+    | Edit/Write | Track edit count, remind at 5/10 edits |
+    | git commit | Remind to run quality gates |
+    | git push | Remind about /wrap-up |
+  </Accordion>
+
+  <Accordion title="PostToolUse Hooks">
+    | Trigger | Action |
+    |---------|--------|
+    | Code edit (.ts/.js/.py/.go) | Check for console.log, TODOs, secrets |
+    | Test commands | Suggest [LEARN] from failures |
+  </Accordion>
+
+  <Accordion title="Session Hooks">
+    | Hook | Action |
+    |------|--------|
+    | SessionStart | Load LEARNED patterns, show worktree count |
+    | Stop | Context-aware reminders |
+    | SessionEnd | Check uncommitted changes, prompt for learnings |
+    | ConfigChange | Detect mid-session changes |
+  </Accordion>
+
+  <Accordion title="New in v2.0">
+    - **SubagentStart/Stop** - Log agent lifecycle
+    - **TaskCompleted** - Quality gate on completion
+    - **PermissionRequest** - Flag dangerous operations
+    - **PostToolUseFailure** - Track failures, suggest learnings
+    - **TeammateIdle** - Detect blockers in agent teams
+  </Accordion>
+</AccordionGroup>
+
+### Hook Philosophy
+
+<Note>
+- **Non-blocking** - Hooks remind, don't block (except dangerous ops)
+- **Checkpoint-based** - Quality gates at intervals, not every edit
+- **Learning-focused** - Always prompt for pattern capture
+</Note>
+
+---
+
+## Verify Installation
+
+Run the `/doctor` command to check your setup:
+
+```bash
+/doctor
+```
+
+<Accordion title="Expected Output">
+  ```text
+  Pro-Workflow Health Check
+    Installation:  OK
+    Hooks:         ACTIVE
+    Context:       15% (healthy)
+    MCPs:          3 active (OK)
+    CLAUDE.md:     42 lines (OK)
+    Git:           clean
+  ```
+</Accordion>
+
+### Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Commands Missing">
+    ```bash
+    cp -r /path/to/pro-workflow/commands/* ~/.claude/commands/
+    ```
+  </Accordion>
+
+  <Accordion title="Database Missing">
+    ```bash
+    mkdir -p ~/.pro-workflow
+    cd ~/.claude/plugins/*/pro-workflow
+    npm run build
+    ```
+  </Accordion>
+
+  <Accordion title="Hooks Not Firing">
+    Check that paths in `hooks.json` use absolute paths or `${CLAUDE_PLUGIN_ROOT}`:
+    ```json
+    {
+      "script": "${CLAUDE_PLUGIN_ROOT}/scripts/pre-tool-use.sh"
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Context Degraded">
+    Run manual compaction:
+    ```bash
+    /compact
+    ```
+    Or configure earlier auto-compact:
+    ```json
+    {
+      "env": {
+        "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "50"
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Repository Structure
+
+Understanding the layout helps with customization:
+
+```text
+pro-workflow/
+├── .claude-plugin/              # Claude Code plugin definition
+├── .cursor-plugin/              # Cursor plugin definition
+├── skills/                      # 11 skills (Cursor + Claude Code)
+│   ├── pro-workflow/SKILL.md
+│   ├── smart-commit/SKILL.md
+│   ├── context-optimizer/SKILL.md
+│   ├── orchestrate/SKILL.md
+│   └── ...
+├── agents/                      # 5 agents
+│   ├── planner.md
+│   ├── reviewer.md
+│   ├── scout.md
+│   ├── orchestrator.md
+│   └── debugger.md
+├── commands/                    # 10 slash commands
+│   ├── develop.md
+│   ├── doctor.md
+│   ├── wrap-up.md
+│   └── ...
+├── hooks/                       # 18 hook events
+│   └── hooks.json
+├── docs/                        # 7 reference guides
+│   ├── settings-guide.md
+│   ├── cli-cheatsheet.md
+│   ├── orchestration-patterns.md
+│   └── ...
+├── rules/                       # 6 Cursor rules
+├── contexts/                    # 3 context modes
+├── templates/                   # Split CLAUDE.md templates
+├── settings.example.json        # Production settings template
+├── mcp-config.example.json      # Curated MCP recommendations
+└── src/                         # TypeScript source (SQLite)
+```
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Try your first command in 30 seconds
+  </Card>
+  <Card title="Core Patterns" icon="book" href="/patterns/self-correction">
+    Learn the patterns that make Pro Workflow powerful
+  </Card>
+  <Card title="Commands" icon="terminal" href="/commands/overview">
+    Master all 10 commands and their usage
+  </Card>
+  <Card title="Settings Guide" icon="gear" href="/guides/settings-guide">
+    Deep dive into configuration options
+  </Card>
+</CardGroup>

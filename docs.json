@@ -1,122 +1,168 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Pro Workflow",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#D97757",
+    "light": "#E8926F",
+    "dark": "#1e1e2e"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/rohitg00/pro-workflow"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/rohitg00/pro-workflow"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "installation"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/architecture",
+              "concepts/self-correction-loop",
+              "concepts/orchestration-patterns",
+              "concepts/multi-phase-development",
+              "concepts/parallel-worktrees",
+              "concepts/80-20-review"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Skills",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "skills/overview",
+              "skills/pro-workflow",
+              "skills/smart-commit",
+              "skills/wrap-up",
+              "skills/learn-rule",
+              "skills/parallel-worktrees",
+              "skills/replay-learnings",
+              "skills/session-handoff",
+              "skills/insights",
+              "skills/deslop",
+              "skills/context-optimizer",
+              "skills/orchestrate"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Agents",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "agents/overview",
+              "agents/planner",
+              "agents/reviewer",
+              "agents/scout",
+              "agents/orchestrator",
+              "agents/debugger"
+            ]
+          },
+          {
+            "group": "Commands",
+            "pages": [
+              "commands/overview",
+              "commands/develop",
+              "commands/doctor",
+              "commands/commit",
+              "commands/wrap-up",
+              "commands/learn-rule",
+              "commands/handoff",
+              "commands/insights",
+              "commands/replay",
+              "commands/search",
+              "commands/list",
+              "commands/parallel"
+            ]
+          },
+          {
+            "group": "Hooks & Events",
+            "pages": [
+              "hooks/overview",
+              "hooks/lifecycle",
+              "hooks/custom-hooks"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/settings",
+              "configuration/mcp-servers",
+              "configuration/quality-gates",
+              "configuration/model-preferences"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/cross-agent-workflows",
+              "guides/context-loading",
+              "guides/daily-habits",
+              "guides/cli-cheatsheet",
+              "guides/split-memory"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Database API",
             "pages": [
-              "api-reference/introduction"
+              "api/database/overview",
+              "api/database/learnings",
+              "api/database/sessions",
+              "api/database/search"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Plugin API",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/plugin/claude-code",
+              "api/plugin/cursor",
+              "api/plugin/skillkit"
+            ]
+          },
+          {
+            "group": "Command API",
+            "pages": [
+              "api/commands/frontmatter",
+              "api/commands/arguments",
+              "api/commands/delegation"
+            ]
+          },
+          {
+            "group": "Agent API",
+            "pages": [
+              "api/agents/frontmatter",
+              "api/agents/tools",
+              "api/agents/skills",
+              "api/agents/memory"
+            ]
+          },
+          {
+            "group": "Skill API",
+            "pages": [
+              "api/skills/frontmatter",
+              "api/skills/discovery",
+              "api/skills/preloading"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

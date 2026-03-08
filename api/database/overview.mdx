@@ -1,0 +1,206 @@
+---
+title: Database Overview
+description: SQLite-based persistent storage for learnings and session data
+---
+
+The Pro Workflow database provides persistent storage for learnings, session analytics, and full-text search capabilities. Built on SQLite with FTS5 (Full-Text Search) for fast BM25-ranked queries.
+
+## Architecture
+
+```typescript
+import { initializeDatabase, createStore } from 'pro-workflow';
+
+const db = initializeDatabase(); // Creates ~/.pro-workflow/data.db
+const store = createStore();     // Returns high-level API
+```
+
+## Database Location
+
+**Default path:** `~/.pro-workflow/data.db`
+
+<Tip>
+  The database directory is created automatically on first use. No manual setup required.
+</Tip>
+
+## Core Features
+
+<CardGroup cols={2}>
+  <Card title="Learnings Storage" icon="brain">
+    Persistent memory for corrections, patterns, and rules. Searchable via full-text search with BM25 ranking.
+  </Card>
+  <Card title="Session Tracking" icon="clock">
+    Track edit counts, correction counts, and prompts per session. Analyze productivity patterns.
+  </Card>
+  <Card title="FTS5 Search" icon="magnifying-glass">
+    Fast prefix matching, phrase search, and BM25 relevance scoring. Sub-millisecond queries.
+  </Card>
+  <Card title="Project Scoping" icon="folder">
+    Filter learnings by project. Share global learnings across projects or keep them isolated.
+  </Card>
+</CardGroup>
+
+## Schema
+
+### Tables
+
+| Table | Purpose |
+|-------|--------|
+| `learnings` | Core learning storage with category, rule, mistake, correction |
+| `learnings_fts` | FTS5 virtual table for full-text search |
+| `sessions` | Session metadata with timing and activity counts |
+
+### Indexes
+
+- `idx_learnings_category` — Fast category filtering
+- `idx_learnings_project` — Fast project scoping
+- `idx_learnings_created_at` — Chronological queries
+- `idx_sessions_project` — Session-by-project lookups
+- `idx_sessions_started_at` — Recent sessions
+
+## Database Configuration
+
+<ParamField path="dbPath" type="string" default="~/.pro-workflow/data.db">
+  Custom database location. Must be an absolute path.
+</ParamField>
+
+```typescript
+import { createStore } from 'pro-workflow';
+
+const store = createStore('/custom/path/to/data.db');
+```
+
+## SQLite Pragmas
+
+The database is initialized with optimized settings:
+
+<CodeGroup>
+```sql Pragmas
+PRAGMA journal_mode = WAL;  -- Write-Ahead Logging for concurrency
+PRAGMA foreign_keys = ON;   -- Enforce referential integrity
+```
+</CodeGroup>
+
+<Note>
+  WAL mode allows multiple readers and one writer simultaneously. Perfect for background hooks and parallel agents.
+</Note>
+
+## Triggers
+
+Automatic FTS synchronization via triggers:
+
+<Accordion title="View Trigger Details">
+
+```sql
+-- After insert: add to FTS index
+CREATE TRIGGER learnings_ai AFTER INSERT ON learnings BEGIN
+  INSERT INTO learnings_fts(rowid, category, rule, mistake, correction)
+  VALUES (new.id, new.category, new.rule, new.mistake, new.correction);
+END;
+
+-- After update: re-index
+CREATE TRIGGER learnings_au AFTER UPDATE ON learnings BEGIN
+  INSERT INTO learnings_fts(learnings_fts, rowid, category, rule, mistake, correction)
+  VALUES ('delete', old.id, old.category, old.rule, old.mistake, old.correction);
+  INSERT INTO learnings_fts(rowid, category, rule, mistake, correction)
+  VALUES (new.id, new.category, new.rule, new.mistake, new.correction);
+END;
+
+-- After delete: remove from FTS
+CREATE TRIGGER learnings_ad AFTER DELETE ON learnings BEGIN
+  INSERT INTO learnings_fts(learnings_fts, rowid, category, rule, mistake, correction)
+  VALUES ('delete', old.id, old.category, old.rule, old.mistake, old.correction);
+END;
+```
+
+</Accordion>
+
+## API Functions
+
+### Initialization
+
+<ResponseField name="initializeDatabase" type="(dbPath?: string) => Database">
+  Initialize the database with schema and indexes. Idempotent — safe to call multiple times.
+</ResponseField>
+
+<ResponseField name="getDefaultDbPath" type="() => string">
+  Returns `~/.pro-workflow/data.db`. Use for custom configurations.
+</ResponseField>
+
+<ResponseField name="ensureDbDir" type="() => void">
+  Create `~/.pro-workflow/` if it doesn't exist. Called automatically by `initializeDatabase`.
+</ResponseField>
+
+### Store API
+
+<ResponseField name="createStore" type="(dbPath?: string) => Store">
+  Create a high-level store instance with methods for learnings and sessions.
+</ResponseField>
+
+## Example Usage
+
+<CodeGroup>
+
+```typescript Initialization
+import { createStore } from 'pro-workflow';
+
+const store = createStore();
+
+// Add a learning
+const learning = store.addLearning({
+  project: 'my-app',
+  category: 'Testing',
+  rule: 'Run tests after editing server code',
+  mistake: 'Pushed broken API endpoint',
+  correction: 'Added npm test to pre-push hook'
+});
+
+console.log(`Saved as learning #${learning.id}`);
+
+// Close when done
+store.close();
+```
+
+```typescript Session Tracking
+import { createStore } from 'pro-workflow';
+
+const store = createStore();
+const sessionId = process.env.CLAUDE_SESSION_ID || 'local-123';
+
+// Start session
+store.startSession(sessionId, 'my-app');
+
+// Track activity
+store.updateSessionCounts(sessionId, 1, 0, 1); // 1 edit, 0 corrections, 1 prompt
+
+// End session
+store.endSession(sessionId);
+
+store.close();
+```
+
+```bash CLI Usage
+# Initialize database
+node -e "require('pro-workflow').initializeDatabase(); console.log('Ready')"
+
+# Query directly
+sqlite3 ~/.pro-workflow/data.db "SELECT * FROM learnings LIMIT 5"
+```
+
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Learnings API" icon="book" href="/api/database/learnings">
+    CRUD operations for learnings storage
+  </Card>
+  <Card title="Sessions API" icon="calendar" href="/api/database/sessions">
+    Track and query session analytics
+  </Card>
+  <Card title="Search API" icon="search" href="/api/database/search">
+    Full-text search with BM25 ranking
+  </Card>
+  <Card title="Plugin Config" icon="plug" href="/api/plugin/claude-code">
+    Install the database as a Claude Code plugin
+  </Card>
+</CardGroup>

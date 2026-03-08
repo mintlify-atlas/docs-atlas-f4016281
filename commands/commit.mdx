@@ -1,0 +1,365 @@
+---
+title: /commit
+description: Smart commit with quality gates and conventional message format
+---
+
+# /commit Command
+
+Create a well-crafted commit after running pro-workflow quality checks. The `/commit` command enforces quality gates, scans for issues, and drafts conventional commit messages.
+
+## Syntax
+
+```bash
+/commit
+/commit --no-verify
+/commit --amend
+/commit --push
+```
+
+## The 6-Step Process
+
+<Steps>
+  <Step title="Pre-Commit Checks">
+    Review what's being committed:
+    
+    ```bash
+    git status
+    git diff --stat
+    ```
+    
+    **Checks:**
+    - Any unstaged changes to include?
+    - Any files that shouldn't be committed (.env, credentials, large binaries)?
+  </Step>
+  
+  <Step title="Quality Gates">
+    Run lint, typecheck, and tests:
+    
+    ```bash
+    npm run lint 2>&1 | tail -5
+    npm run typecheck 2>&1 | tail -5
+    npm test -- --changed --passWithNoTests 2>&1 | tail -10
+    ```
+    
+    **Decision:**
+    - All checks passing → Proceed
+    - Any failures → Fix before committing
+    - Skip only if user explicitly says to
+  </Step>
+  
+  <Step title="Code Review">
+    Scan staged changes for issues:
+    
+    **Patterns to flag:**
+    - `console.log` / `debugger` statements
+    - TODO/FIXME/HACK comments without tickets
+    - Hardcoded secrets or API keys
+    - Leftover test-only code
+    
+    Flag any issues before proceeding.
+  </Step>
+  
+  <Step title="Commit Message">
+    Draft a conventional commit message:
+    
+    ```text
+    <type>(<scope>): <short summary>
+    
+    <body - what changed and why>
+    ```
+    
+    **Types:** feat, fix, refactor, test, docs, chore, perf, ci, style
+    
+    **Rules:**
+    - Summary under 72 characters
+    - Body explains *why*, not *what*
+    - Reference issue numbers when applicable
+    - No generic messages ("fix bug", "update code")
+  </Step>
+  
+  <Step title="Stage and Commit">
+    Stage specific files and commit:
+    
+    ```bash
+    git add <specific files>
+    git commit -m "<message>"
+    ```
+    
+    **Rules:**
+    - Stage specific files, not `git add -A`
+    - Show the commit hash and summary after
+  </Step>
+  
+  <Step title="Learning Check">
+    Capture learnings from the change:
+    
+    **Ask:**
+    - Any learnings from this change to capture?
+    - Any patterns worth adding to LEARNED?
+  </Step>
+</Steps>
+
+## Options
+
+### --no-verify
+
+Skip quality gates (use sparingly):
+
+```bash
+/commit --no-verify
+```
+
+<Warning>
+Only use `--no-verify` for hotfixes or when quality gates are broken. Bypassing gates regularly defeats the purpose.
+</Warning>
+
+### --amend
+
+Amend the previous commit:
+
+```bash
+/commit --amend
+```
+
+**Use cases:**
+- Fix typo in commit message
+- Add forgotten file to last commit
+- Squash fixup into last commit
+
+**Rules:**
+- Only amend commits that haven't been pushed
+- Never amend commits on shared branches
+
+### --push
+
+Push to remote after committing:
+
+```bash
+/commit --push
+```
+
+Equivalent to:
+```bash
+/commit
+git push
+```
+
+## Conventional Commit Format
+
+### Commit Types
+
+| Type | When to Use | Example |
+|------|-------------|----------|
+| **feat** | New feature or capability | `feat(auth): add rate limiting to login` |
+| **fix** | Bug fix | `fix(api): handle null user in session middleware` |
+| **refactor** | Code restructuring, no behavior change | `refactor(db): extract connection pool logic` |
+| **test** | Adding or updating tests | `test(auth): add tests for password reset flow` |
+| **docs** | Documentation changes | `docs(api): update rate limit documentation` |
+| **chore** | Maintenance, deps, config | `chore(deps): upgrade express to 4.18.2` |
+| **perf** | Performance improvements | `perf(query): add index on user_id column` |
+| **ci** | CI/CD pipeline changes | `ci(github): add workflow for integration tests` |
+| **style** | Formatting, linting, whitespace | `style(auth): fix eslint warnings` |
+
+### Scope
+
+The scope is optional but recommended:
+
+```text
+feat(auth): add JWT refresh tokens
+fix(api/users): validate email format
+refactor(db): extract connection pooling
+```
+
+**Common scopes:**
+- Module names: `auth`, `api`, `frontend`
+- File paths: `api/users`, `frontend/components`
+- Features: `rate-limiting`, `caching`, `logging`
+
+### Body
+
+Explain *why* the change was made:
+
+```text
+feat(api): add rate limiting to login endpoint
+
+Limit login attempts to 5 per IP per 15 minutes using
+Redis-backed sliding window. Returns 429 with Retry-After
+header when exceeded.
+
+Prevents brute force attacks on user accounts.
+
+Closes #142
+```
+
+## Example Flow
+
+```bash
+> /commit
+
+Pre-commit checks:
+  Staged: src/auth/login.ts (+45 -12)
+  Staged: src/auth/session.ts (+8 -3)
+  Unstaged: tests/auth.test.ts
+  
+Include tests/auth.test.ts? (y/n)
+> y
+
+Running quality gates...
+✓ Lint: PASS
+✓ Types: PASS
+✓ Tests: 12/12 PASS (2.3s)
+
+Code review:
+✓ No console.log statements
+✓ No TODOs
+✓ No secrets detected
+
+Suggested commit:
+  feat(auth): add rate limiting to login endpoint
+  
+  Limit login attempts to 5 per IP per 15 minutes using
+  Redis-backed sliding window. Returns 429 with Retry-After
+  header when exceeded.
+  
+  Closes #142
+
+Commit with this message? (y/edit/n)
+> y
+
+Committing...
+[main 3a7b9f2] feat(auth): add rate limiting to login endpoint
+ 3 files changed, 53 insertions(+), 15 deletions(-)
+
+Commit successful: 3a7b9f2
+
+Any learnings to capture? (y/n)
+> y
+
+[LEARN] Rate Limiting: Use Redis sliding window for distributed rate limits, not in-memory counters
+
+Saved to database.
+```
+
+## Quality Gate Configuration
+
+Quality gates are configurable in `config.json`:
+
+```json
+{
+  "quality_gates": {
+    "run_lint": true,
+    "run_typecheck": true,
+    "run_tests": true,
+    "lint_command": "npm run lint",
+    "typecheck_command": "npm run typecheck",
+    "test_command": "npm test -- --related"
+  }
+}
+```
+
+See [Quality Gates Configuration](/configuration/quality-gates) for details.
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Commit Often" icon="clock">
+    Make small, focused commits. Easier to review, revert, and understand.
+  </Card>
+  <Card title="Run Gates Always" icon="shield">
+    Only skip quality gates for emergency hotfixes. Gates prevent bugs from entering history.
+  </Card>
+  <Card title="Write Good Messages" icon="pen">
+    Explain *why* the change was made. Future you will thank you.
+  </Card>
+  <Card title="Capture Learnings" icon="brain">
+    After committing, run `/learn-rule` if you learned something new.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Quality gates keep failing">
+    If quality gates consistently fail:
+    
+    1. Run gates manually to see full output:
+       ```bash
+       npm run lint
+       npm run typecheck
+       npm test
+       ```
+    
+    2. Fix existing issues first before new changes
+    
+    3. Adjust gate commands if needed:
+       ```json
+       {
+         "test_command": "npm test -- --changed"
+       }
+       ```
+    
+    4. Disable specific gates temporarily:
+       ```json
+       {
+         "run_tests": false
+       }
+       ```
+  </Accordion>
+  
+  <Accordion title="Commit message keeps getting rejected">
+    If commit messages don't follow conventions:
+    
+    1. Check the format:
+       ```text
+       type(scope): summary under 72 chars
+       
+       Body explaining why
+       ```
+    
+    2. Use valid types: feat, fix, refactor, test, docs, chore, perf, ci, style
+    
+    3. Keep summary concise (no periods at the end)
+    
+    4. Add body for non-trivial changes
+  </Accordion>
+  
+  <Accordion title="Code review flags false positives">
+    If code review incorrectly flags code:
+    
+    1. Explain why the pattern is intentional:
+       ```typescript
+       // Intentional: debug logging for production issue investigation
+       console.error('Auth failure:', { userId, timestamp });
+       ```
+    
+    2. Override the warning:
+       ```bash
+       /commit --no-verify
+       ```
+    
+    3. Adjust scan patterns in hooks if needed
+  </Accordion>
+</AccordionGroup>
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="/develop" icon="code" href="/commands/develop">
+    Multi-phase development with commit at the end
+  </Card>
+  <Card title="/wrap-up" icon="check-double" href="/commands/wrap-up">
+    Full session audit with commit check
+  </Card>
+  <Card title="/learn-rule" icon="brain" href="/commands/learn-rule">
+    Capture learnings after committing
+  </Card>
+  <Card title="Smart Commit Skill" icon="code-commit" href="/skills/smart-commit">
+    Deep dive on smart commit patterns
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+- Configure [Quality Gates](/configuration/quality-gates)
+- Learn [Conventional Commits](https://www.conventionalcommits.org/)
+- Set up [Git Hooks](/hooks/custom-hooks)

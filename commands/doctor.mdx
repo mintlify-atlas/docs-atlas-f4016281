@@ -1,0 +1,392 @@
+---
+title: /doctor
+description: Health check for your pro-workflow setup and Claude Code configuration
+---
+
+# /doctor Command
+
+Run a comprehensive diagnostic on your pro-workflow and Claude Code setup. Identifies configuration issues, context problems, and setup gaps.
+
+## Syntax
+
+```bash
+/doctor
+```
+
+No arguments required.
+
+## What It Checks
+
+<Steps>
+  <Step title="Pro-Workflow Installation">
+    Verifies commands and database are installed:
+    
+    ```bash
+    ls -la ~/.claude/commands/wrap-up.md 2>/dev/null && echo "Commands: OK" || echo "Commands: MISSING"
+    ls -la ~/.pro-workflow/data.db 2>/dev/null && echo "Database: OK" || echo "Database: MISSING"
+    ```
+    
+    **Status:** OK | NEEDS SETUP
+  </Step>
+  
+  <Step title="Hooks Status">
+    Checks if hooks.json is loaded and hooks are active:
+    
+    ```bash
+    cat ~/.claude/settings.local.json 2>/dev/null | head -5
+    ```
+    
+    **Checks:**
+    - hooks.json in correct location
+    - Script paths use `${CLAUDE_PLUGIN_ROOT}` or absolute paths
+    - Scripts have execute permissions
+    
+    **Status:** ACTIVE | INACTIVE
+  </Step>
+  
+  <Step title="Context Health">
+    Measures context window usage:
+    
+    ```text
+    /context
+    ```
+    
+    **Thresholds:**
+    - Usage &lt; 70%: **Healthy**
+    - Usage 70-90%: **Warning** — Consider `/compact`
+    - Usage &gt; 90%: **Critical** — Compact immediately or start fresh
+    
+    **Status:** Healthy | Warning | Critical
+  </Step>
+  
+  <Step title="MCP Servers">
+    Counts active MCP servers and tools:
+    
+    **Target:** &lt;10 servers, &lt;80 tools
+    
+    **Status:** OK | TOO MANY
+  </Step>
+  
+  <Step title="CLAUDE.md Size">
+    Checks memory file length:
+    
+    ```bash
+    wc -l CLAUDE.md 2>/dev/null || echo "No CLAUDE.md found"
+    ```
+    
+    **Thresholds:**
+    - &lt; 60 lines: **Ideal**
+    - 60-150 lines: **Acceptable**
+    - &gt; 150 lines: **Too long** — Split into modules
+    
+    **Status:** Ideal | Acceptable | Split Recommended
+  </Step>
+  
+  <Step title="Git Status">
+    Checks for uncommitted changes and stale stashes:
+    
+    ```bash
+    git status --short
+    git stash list
+    ```
+    
+    **Flags:**
+    - Uncommitted changes → Commit or stash
+    - Stale stashes → Clean up
+    
+    **Status:** Clean | X uncommitted files
+  </Step>
+  
+  <Step title="Settings Validation">
+    Checks for conflicting settings:
+    
+    ```bash
+    cat .claude/settings.json 2>/dev/null | head -3
+    cat ~/.claude/settings.json 2>/dev/null | head -3
+    ```
+    
+    **Checks:**
+    - Conflicting settings between project and user level
+    - Permission rules are correct
+    
+    **Status:** OK | Conflicts Detected
+  </Step>
+</Steps>
+
+## Quick Fixes
+
+The `/doctor` command provides fixes for common issues:
+
+| Issue | Fix |
+|-------|-----|
+| Commands missing | `cp -r /path/to/pro-workflow/commands/* ~/.claude/commands/` |
+| Database missing | `mkdir -p ~/.pro-workflow && npm run build` (in plugin dir) |
+| Hooks not firing | Check paths in hooks.json use absolute paths |
+| Context degraded | Run `/compact` or start fresh session |
+| Too many MCPs | Disable unused: `disabledMcpServers` in settings |
+| CLAUDE.md too long | Split into root + package-level files |
+
+## Example Output
+
+```text
+> /doctor
+
+Pro-Workflow Health Check
+=========================
+
+✓ Installation:  OK
+  Commands: ~/.claude/commands/ (11 found)
+  Database: ~/.pro-workflow/data.db (47 learnings)
+
+✓ Hooks:         ACTIVE
+  18 hook events registered
+  Last hook: PostToolUse (2 minutes ago)
+
+⚠ Context:       78% (warning)
+  Recommendation: Run /compact at next task boundary
+
+⚠ MCPs:          12 active (too many)
+  Tools: 94 total
+  Recommendation: Disable unused MCPs
+  Rarely used: context7 (0 uses this session)
+
+✓ CLAUDE.md:     58 lines (ideal)
+  Location: ./CLAUDE.md
+
+✓ Git:           clean
+  No uncommitted changes
+  No stale stashes
+
+✓ Settings:      OK
+  No conflicts detected
+
+Overall: 2 warnings, 0 errors
+```
+
+## When to Run /doctor
+
+<Tabs>
+  <Tab title="Run Weekly">
+    **Scheduled health check:**
+    - Every Monday or at start of sprint
+    - After installing new MCPs
+    - After major config changes
+    - When sessions feel slow
+  </Tab>
+  
+  <Tab title="Run When Issues Arise">
+    **Troubleshooting:**
+    - Commands not working
+    - Hooks not firing
+    - Context feels bloated
+    - Quality gates failing
+    - Database queries slow
+  </Tab>
+  
+  <Tab title="Run After Setup">
+    **Post-installation verification:**
+    - After plugin install
+    - After updating pro-workflow
+    - After migrating to new machine
+    - After major Claude Code update
+  </Tab>
+</Tabs>
+
+## Interpreting Results
+
+### Installation Issues
+
+**Commands Missing:**
+```bash
+# Claude Code plugin install
+/plugin marketplace add rohitg00/pro-workflow
+/plugin install pro-workflow@pro-workflow
+
+# Or manual install
+cp -r /path/to/pro-workflow/commands/* ~/.claude/commands/
+```
+
+**Database Missing:**
+```bash
+cd ~/.claude/plugins/*/pro-workflow
+npm install && npm run build
+```
+
+### Hook Issues
+
+**Hooks Inactive:**
+
+Check hooks.json paths:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": {
+      "Edit": {
+        "script": "${CLAUDE_PLUGIN_ROOT}/scripts/post-edit.js"
+      }
+    }
+  }
+}
+```
+
+Ensure scripts are executable:
+```bash
+chmod +x scripts/*.js
+```
+
+### Context Issues
+
+**High Context Usage (>70%):**
+
+```bash
+# Check current usage
+/context
+
+# Compact at task boundary
+/compact
+
+# Or start fresh session
+# (after /wrap-up to save state)
+```
+
+**Critical Context Usage (>90%):**
+
+Start a fresh session immediately. High context degrades quality.
+
+### MCP Issues
+
+**Too Many MCPs (>10 servers):**
+
+Disable unused MCPs in settings.json:
+
+```json
+{
+  "disabledMcpServers": ["context7", "memory"]
+}
+```
+
+Or remove from mcp.json:
+
+```bash
+# Check usage
+/mcp stats
+
+# Remove unused
+rm ~/.claude/mcp/servers/unused-server.json
+```
+
+### CLAUDE.md Issues
+
+**File Too Long (>150 lines):**
+
+Split into modular files:
+
+```text
+project/
+├── CLAUDE.md                  # Root (project-wide patterns)
+├── packages/
+│   ├── api/
+│   │   └── CLAUDE.md         # API-specific patterns
+│   └── frontend/
+│       └── CLAUDE.md         # Frontend-specific patterns
+```
+
+See [Split Memory Guide](/guides/split-memory) for details.
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Run Weekly" icon="calendar">
+    Schedule a weekly `/doctor` check to catch config drift early.
+  </Card>
+  <Card title="After Plugin Updates" icon="rotate">
+    Run `/doctor` after updating pro-workflow or Claude Code.
+  </Card>
+  <Card title="Before Big Features" icon="rocket">
+    Verify health before starting large features with `/develop`.
+  </Card>
+  <Card title="Share Reports" icon="share">
+    Share `/doctor` output when asking for support or reporting issues.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="/doctor command not found">
+    If `/doctor` isn't recognized:
+    
+    1. Check plugin installation:
+       ```bash
+       ls ~/.claude/commands/doctor.md
+       ```
+    
+    2. Try with full namespace:
+       ```bash
+       /pro-workflow:doctor
+       ```
+    
+    3. Reinstall plugin:
+       ```bash
+       /plugin install pro-workflow@pro-workflow
+       ```
+  </Accordion>
+  
+  <Accordion title="Database check fails">
+    If database isn't found:
+    
+    1. Check location:
+       ```bash
+       ls ~/.pro-workflow/data.db
+       ```
+    
+    2. Initialize database:
+       ```bash
+       cd ~/.claude/plugins/*/pro-workflow
+       npm run db:init
+       ```
+    
+    3. Verify SQLite support:
+       ```bash
+       node -e "require('better-sqlite3')"
+       ```
+  </Accordion>
+  
+  <Accordion title="Hooks show as inactive">
+    If hooks aren't firing:
+    
+    1. Check hooks.json location:
+       ```bash
+       ls .claude/hooks/hooks.json
+       ls ~/.claude/hooks/hooks.json
+       ```
+    
+    2. Verify script paths:
+       ```bash
+       cat .claude/hooks/hooks.json | grep script
+       ```
+    
+    3. Test hook manually:
+       ```bash
+       node .claude/hooks/scripts/post-edit.js
+       ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="/wrap-up" icon="check-double" href="/commands/wrap-up">
+    Full session audit after fixing issues
+  </Card>
+  <Card title="Settings Guide" icon="gear" href="/configuration/settings">
+    Complete settings reference
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+- Review [Configuration Guide](/configuration/settings)
+- Set up [MCP Servers](/configuration/mcp-servers)
+- Configure [Quality Gates](/configuration/quality-gates)

@@ -1,0 +1,350 @@
+---
+title: 'Skills Overview'
+description: 'Complete skill system for AI-assisted development with learning, optimization, and orchestration patterns'
+icon: 'puzzle-piece'
+---
+
+## What Are Skills?
+
+Skills are reusable procedures and domain knowledge that can be invoked by commands, agents, or users. They provide structured workflows for common coding tasks, enforce best practices, and capture learnings that compound over time.
+
+<CardGroup cols={2}>
+  <Card title="11 Production Skills" icon="sparkles">
+    Battle-tested workflows from real development sessions
+  </Card>
+  <Card title="Cross-Agent Support" icon="network-wired">
+    Works with Claude Code, Cursor, and 32+ agents via SkillKit
+  </Card>
+  <Card title="Learning System" icon="brain">
+    Self-correcting patterns that improve with every session
+  </Card>
+  <Card title="Orchestration Ready" icon="diagram-project">
+    Wire skills into multi-phase workflows with validation gates
+  </Card>
+</CardGroup>
+
+## Core Skills
+
+The Pro Workflow system includes 11 specialized skills:
+
+<AccordionGroup>
+  <Accordion title="Pro Workflow - Complete AI Coding System" icon="star">
+    The master skill containing all core patterns:
+    - Self-correction loop
+    - Parallel worktrees for zero dead time
+    - Context discipline and token management
+    - Learning capture and replay
+    - Multi-phase development orchestration
+    
+    [View full documentation →](/skills/pro-workflow)
+  </Accordion>
+
+  <Accordion title="Smart Commit - Quality Gates & Commits" icon="code-commit">
+    Automate quality checks and create well-crafted commits:
+    - Run lint, typecheck, tests on affected files
+    - Scan for console.log, TODOs, secrets
+    - Generate conventional commit messages
+    - Stage specific files (never `git add .`)
+    
+    [View full documentation →](/skills/smart-commit)
+  </Accordion>
+
+  <Accordion title="Wrap-Up - End-of-Session Ritual" icon="check-circle">
+    End sessions with intention:
+    - Audit modified files and uncommitted changes
+    - Run quality checks
+    - Capture learnings from mistakes
+    - Generate session summary
+    
+    [View full documentation →](/skills/wrap-up)
+  </Accordion>
+
+  <Accordion title="Learn Rule - Capture Corrections" icon="graduation-cap">
+    Turn mistakes into permanent memory:
+    - Extract lessons from corrections
+    - Categorize by type (Navigation, Testing, Git, etc.)
+    - Store with full context
+    - Surface in future sessions
+    
+    [View full documentation →](/skills/learn-rule)
+  </Accordion>
+
+  <Accordion title="Parallel Worktrees - Zero Dead Time" icon="code-branch">
+    Work on multiple tasks simultaneously:
+    - Create isolated git worktrees
+    - Run parallel sessions while tests run
+    - Manage background agents
+    - Clean up automatically
+    
+    [View full documentation →](/skills/parallel-worktrees)
+  </Accordion>
+
+  <Accordion title="Replay Learnings - Apply Past Lessons" icon="rotate-right">
+    Surface relevant learnings before starting work:
+    - Search past corrections by keyword
+    - Rank by relevance to current task
+    - Flag high correction-rate areas
+    - Suggest approaches based on history
+    
+    [View full documentation →](/skills/replay-learnings)
+  </Accordion>
+
+  <Accordion title="Session Handoff - Resume Context" icon="hand-holding-hand">
+    Generate handoff documents for session continuity:
+    - Current branch and commit status
+    - Completed, in-progress, pending tasks
+    - Key decisions and reasoning
+    - Copy-pasteable resume command
+    
+    [View full documentation →](/skills/session-handoff)
+  </Accordion>
+
+  <Accordion title="Insights - Session Analytics" icon="chart-line">
+    Track patterns and productivity:
+    - Learning category breakdown
+    - Correction rate trends
+    - Most/least applied patterns
+    - Stale learnings that need review
+    
+    [View full documentation →](/skills/insights)
+  </Accordion>
+
+  <Accordion title="Deslop - Remove AI Code Bloat" icon="broom">
+    Clean up AI-generated over-engineering:
+    - Remove unnecessary comments
+    - Strip defensive try/catch blocks
+    - Simplify premature abstractions
+    - Delete backwards-compatibility hacks
+    
+    [View full documentation →](/skills/deslop)
+  </Accordion>
+
+  <Accordion title="Context Optimizer - Token Management" icon="gauge-high">
+    Manage context window and token budget:
+    - Proactive compaction at 50%
+    - MCP audit (keep &lt;10 MCPs, &lt;80 tools)
+    - Subagent delegation patterns
+    - CLAUDE.md optimization
+    
+    [View full documentation →](/skills/context-optimizer)
+  </Accordion>
+
+  <Accordion title="Orchestrate - Multi-Phase Development" icon="diagram-project">
+    Wire Commands, Agents, and Skills together:
+    - Research → Plan → Implement → Review
+    - Validation gates between phases
+    - Confidence scoring (GO/HOLD)
+    - Never proceed without approval
+    
+    [View full documentation →](/skills/orchestrate)
+  </Accordion>
+</AccordionGroup>
+
+## How Skills Work
+
+### Two Types of Skills
+
+<CodeGroup>
+```yaml Agent Skills (Preloaded)
+---
+name: planner
+skills: ["api-conventions", "project-patterns"]
+---
+# Full skill content injected at agent startup
+# Always available, no invocation needed
+```
+
+```yaml On-Demand Skills (Invoked)
+---
+name: smart-commit
+user-invocable: true
+context: fork
+---
+# Loaded only when called
+# Runs in isolated context if context: fork
+```
+</CodeGroup>
+
+<Note>
+**Agent skills** use context tokens but are always available. **On-demand skills** load only when called, keeping main context clean.
+</Note>
+
+### Invocation Methods
+
+| Method | Example | When to Use |
+|--------|---------|-------------|
+| **Command** | `/smart-commit` | User-triggered workflows |
+| **Agent preload** | `skills: ["pro-workflow"]` | Domain knowledge always needed |
+| **Skill tool** | `Skill("replay-learnings")` | AI-initiated, conditional use |
+
+## Usage Patterns
+
+### Pattern 1: Self-Correction Loop
+
+The most powerful pattern - Claude learns from corrections automatically:
+
+```text
+User: You edited the wrong file
+Claude: I edited src/utils.ts when you meant src/lib/utils.ts.
+
+[LEARN] Navigation: Confirm full path before editing files with common names.
+
+Should I add this?
+```
+
+After approval, the rule persists to memory. Future sessions avoid the same mistake.
+
+### Pattern 2: Session Lifecycle
+
+Structured workflow from start to finish:
+
+```mermaid
+graph LR
+    A[SessionStart] --> B[Replay Learnings]
+    B --> C[Plan & Implement]
+    C --> D[Smart Commit]
+    D --> E[Wrap-Up]
+    E --> F[Session Handoff]
+    
+    style A fill:#D97757,color:#fff,stroke:none
+    style E fill:#22c55e,color:#fff,stroke:none
+```
+
+### Pattern 3: Multi-Phase Development
+
+For complex features requiring validation gates:
+
+```bash
+/develop "add webhook support"
+  ↓
+[Research] → confidence score → GO/HOLD
+  ↓
+[Plan] → present approach → wait for approval
+  ↓
+[Implement] → quality gates every 5 edits
+  ↓
+[Review] → security & quality check → commit
+```
+
+<Warning>
+Never skip phases. Never proceed without approval between phases.
+</Warning>
+
+## Installation
+
+<Tabs>
+  <Tab title="Cursor">
+    ```bash
+    /add-plugin pro-workflow
+    ```
+    All 11 skills load automatically.
+  </Tab>
+  <Tab title="Claude Code">
+    ```bash
+    /plugin marketplace add rohitg00/pro-workflow
+    /plugin install pro-workflow@pro-workflow
+    ```
+    Skills available as `/pro-workflow:<name>` or short forms like `/wrap-up`.
+  </Tab>
+  <Tab title="Manual">
+    ```bash
+    git clone https://github.com/rohitg00/pro-workflow.git /tmp/pw
+    cp -r /tmp/pw/skills/* ./.claude/skills/
+    ```
+    Skills available via Skill() tool or manual invocation.
+  </Tab>
+  <Tab title="Any Agent (SkillKit)">
+    ```bash
+    npx skillkit install pro-workflow
+    npx skillkit translate pro-workflow --agent cursor
+    ```
+    Works with 32+ AI coding agents.
+  </Tab>
+</Tabs>
+
+## Quick Start
+
+### Minimal Setup (30 seconds)
+
+Add to your CLAUDE.md:
+
+```markdown
+## Pro Workflow
+
+### Self-Correction
+When corrected, propose rule → add to LEARNED after approval.
+
+### Planning
+Multi-file: plan first, wait for "proceed".
+
+### Quality
+After edits: lint, typecheck, test.
+
+### LEARNED
+<!-- Auto-populated through corrections -->
+```
+
+### First Session
+
+1. **Start with context**: `/replay what do I know about auth`
+2. **Make changes**: Claude implements with quality gates
+3. **Capture mistakes**: "Remember this" triggers learn-rule
+4. **Commit**: `/smart-commit` runs quality checks automatically
+5. **End intentionally**: `/wrap-up` captures learnings and generates summary
+6. **Handoff**: `/handoff` creates resume context for next session
+
+## Integration with Pro Workflow
+
+Skills work seamlessly with other Pro Workflow components:
+
+<CardGroup cols={2}>
+  <Card title="Agents" icon="users" href="/agents/overview">
+    5 specialized agents with skills preloaded
+  </Card>
+  <Card title="Commands" icon="terminal" href="/commands/overview">
+    10 slash commands that invoke skills
+  </Card>
+  <Card title="Hooks" icon="plug" href="/hooks/overview">
+    18 hook events that trigger skills
+  </Card>
+  <Card title="Rules" icon="gavel" href="/rules/overview">
+    6 Cursor rules enforce skill patterns
+  </Card>
+</CardGroup>
+
+## Philosophy
+
+<Steps>
+  <Step title="Compound Improvements">
+    Small corrections lead to big gains over time. After 50 sessions, Claude barely needs correcting.
+  </Step>
+  <Step title="Trust but Verify">
+    Let AI work between checkpoints. Review at planning, milestones, destructive operations.
+  </Step>
+  <Step title="Zero Dead Time">
+    Parallel worktrees keep momentum while tests run or builds compile.
+  </Step>
+  <Step title="Memory is Precious">
+    Both yours and Claude's. Context discipline, proactive compaction, subagent delegation.
+  </Step>
+  <Step title="Orchestrate, Don't Micromanage">
+    Wire patterns together with Command > Agent > Skill. Let agents execute.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Learn the Core Workflow" icon="star" href="/skills/pro-workflow">
+    Master the complete AI coding workflow system
+  </Card>
+  <Card title="Start with Smart Commit" icon="code-commit" href="/skills/smart-commit">
+    Add quality gates to your commit process
+  </Card>
+  <Card title="Try Multi-Phase Dev" icon="diagram-project" href="/skills/orchestrate">
+    Build features through structured phases
+  </Card>
+  <Card title="Optimize Context" icon="gauge-high" href="/skills/context-optimizer">
+    Manage your token budget effectively
+  </Card>
+</CardGroup>

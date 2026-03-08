@@ -1,0 +1,413 @@
+---
+title: Cursor Plugin
+description: Install and configure Pro Workflow for Cursor IDE
+---
+
+Pro Workflow works with Cursor through the `.cursor` plugin system and `.mdc` rules. Skills, agents, and references are translated to Cursor's format.
+
+## Plugin Manifest
+
+**Location:** `.cursor-plugin/plugin.json`
+
+```json
+{
+  "name": "pro-workflow",
+  "version": "2.0.0",
+  "description": "Complete AI coding workflow system. Orchestration patterns, 18 hook events, 5 agents, 7 reference guides, cross-agent support, and searchable learnings.",
+  "author": {
+    "name": "Rohit Ghumare",
+    "url": "https://github.com/rohitg00"
+  },
+  "homepage": "https://github.com/rohitg00/pro-workflow",
+  "repository": "https://github.com/rohitg00/pro-workflow",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "workflow",
+    "productivity",
+    "self-correction",
+    "worktrees",
+    "hooks",
+    "agents",
+    "best-practices",
+    "sqlite",
+    "fts5",
+    "searchable"
+  ],
+  "skills": ["./skills/"],
+  "agents": [
+    "./agents/planner.md",
+    "./agents/reviewer.md",
+    "./agents/scout.md",
+    "./agents/orchestrator.md",
+    "./agents/debugger.md"
+  ]
+}
+```
+
+## Installation
+
+<Tabs>
+  <Tab title="Via SkillKit">
+    ```bash
+    # Install SkillKit (cross-agent skill translator)
+    npm install -g skillkit
+    
+    # Translate Pro Workflow to Cursor format
+    cd your-project
+    skillkit translate pro-workflow --agent cursor
+    ```
+  </Tab>
+  <Tab title="Manual Setup">
+    ```bash
+    # Clone Pro Workflow
+    git clone https://github.com/rohitg00/pro-workflow.git /tmp/pw
+    
+    # Copy rules to .cursor/
+    mkdir -p .cursor
+    cp -r /tmp/pw/rules/*.md .cursor/
+    
+    # Copy skills
+    mkdir -p .cursor/skills
+    cp -r /tmp/pw/skills/* .cursor/skills/
+    
+    # Install database package
+    npm install pro-workflow
+    ```
+  </Tab>
+  <Tab title="From NPM">
+    ```bash
+    # Install as project dependency
+    npm install pro-workflow
+    
+    # Initialize database
+    npx pro-workflow init
+    ```
+  </Tab>
+</Tabs>
+
+## Cursor Rules (.mdc)
+
+Cursor uses `.mdc` (Markdown Context) files for rules. Pro Workflow provides rules in `rules/`.
+
+<CodeGroup>
+
+```markdown .cursor/core-rules.md
+# Pro Workflow Rules
+
+## Self-Correction
+
+When corrected or when a mistake is made:
+1. Acknowledge specifically what went wrong
+2. Propose a rule: `[LEARN] Category: Rule`
+3. Wait for approval before adding to LEARNED section
+
+## Planning
+
+Use multi-step planning when:
+- Task touches >5 files
+- Architecture decisions needed
+- Requirements unclear
+
+## Quality Gates
+
+Before marking complete:
+1. Run lint
+2. Run typecheck
+3. Run tests (at least --related)
+4. Check for console.log, TODOs, secrets
+
+## Code Review
+
+Pause for review at:
+- Plan completion
+- Every 5 file edits
+- Before git operations
+- Auth/security code
+
+## Learnings
+
+Capture learnings in this format:
+
+```
+[LEARN] Category: One-line rule
+Mistake: What went wrong
+Correction: How it was fixed
+```
+
+Categories: Navigation, Editing, Testing, Git, Quality, Context, Architecture, Performance
+```
+
+</CodeGroup>
+
+## Skills Translation
+
+SkillKit translates Claude Code skills to Cursor-compatible format:
+
+<Accordion title="Skill Translation Example">
+
+**Source (Claude Code):**
+```markdown
+---
+name: wrap-up
+description: End-of-session ritual
+user-invocable: true
+allowed-tools: ["Bash", "Read"]
+---
+
+# Wrap-Up
+
+Run these checks:
+1. git status
+2. Run tests
+3. Capture learnings
+```
+
+**Translated (Cursor):**
+```markdown
+# Wrap-Up Skill
+
+End-of-session ritual.
+
+## Usage
+
+Run these checks:
+1. git status
+2. Run tests
+3. Capture learnings
+
+## Available in Cursor
+
+Use this skill by asking: "Run wrap-up ritual"
+```
+
+</Accordion>
+
+## Agents in Cursor
+
+Cursor doesn't have native agent support. Pro Workflow provides agent instructions as `.mdc` rules:
+
+<CardGroup cols={2}>
+  <Card title="Planner Mode" icon="map">
+    Add to `.cursor/planner.md`:
+    
+    ```markdown
+    # Planner Mode
+    
+    When asked to plan:
+    1. Explore code (read-only)
+    2. List files to change
+    3. Present plan for approval
+    4. Never edit without approval
+    ```
+  </Card>
+  <Card title="Reviewer Mode" icon="shield">
+    Add to `.cursor/reviewer.md`:
+    
+    ```markdown
+    # Reviewer Mode
+    
+    When asked to review:
+    1. Check logic, edge cases, errors
+    2. Security audit
+    3. Performance analysis
+    4. Present findings
+    ```
+  </Card>
+</CardGroup>
+
+## Database Integration
+
+The Pro Workflow database works with Cursor via Node.js scripts:
+
+<CodeGroup>
+
+```typescript Add Learning (Cursor)
+// save-learning.ts
+import { createStore } from 'pro-workflow';
+
+const store = createStore();
+
+store.addLearning({
+  project: process.env.PROJECT_NAME || 'cursor-project',
+  category: 'Testing',
+  rule: 'Run tests before committing',
+  mistake: 'Pushed broken code',
+  correction: 'Added pre-commit hook'
+});
+
+store.close();
+console.log('Learning saved');
+```
+
+```bash Search from Cursor
+# Add to Cursor tasks
+# File: .cursor/tasks/search-learnings.sh
+
+#!/bin/bash
+QUERY="$1"
+
+node -e "
+const { createStore, searchLearnings } = require('pro-workflow');
+const store = createStore();
+const results = searchLearnings(store.db, '$QUERY', { limit: 5 });
+
+for (const r of results) {
+  console.log('#' + r.id + ': ' + r.rule);
+}
+
+store.close();
+"
+```
+
+</CodeGroup>
+
+## Worktree Support
+
+Cursor doesn't have native worktree support. Use git worktrees manually:
+
+```bash
+# Create worktree for feature
+git worktree add ../project-feature feature-branch
+
+# Open in new Cursor window
+cursor ../project-feature
+
+# When done, remove worktree
+git worktree remove ../project-feature
+```
+
+## Hook Alternatives
+
+Cursor doesn't support hooks like Claude Code. Use git hooks instead:
+
+<Accordion title="Pre-Commit Hook">
+
+```bash
+# .git/hooks/pre-commit
+#!/bin/bash
+
+echo "Running quality gates..."
+
+# Lint
+if ! npm run lint; then
+  echo "Lint failed. Fix errors before committing."
+  exit 1
+fi
+
+# Type check
+if ! npm run typecheck; then
+  echo "Type check failed. Fix errors before committing."
+  exit 1
+fi
+
+# Tests
+if ! npm test -- --changed; then
+  echo "Tests failed. Fix tests before committing."
+  exit 1
+fi
+
+echo "Quality gates passed."
+```
+
+</Accordion>
+
+<Accordion title="Post-Commit Hook">
+
+```bash
+# .git/hooks/post-commit
+#!/bin/bash
+
+# Track commit in database
+node -e "
+const { createStore } = require('pro-workflow');
+const store = createStore();
+const sessionId = 'cursor-' + Date.now();
+store.updateSessionCounts(sessionId, 1, 0, 0);
+store.close();
+"
+
+echo "Commit tracked."
+```
+
+</Accordion>
+
+## Configuration Files
+
+<Tabs>
+  <Tab title=".cursor/settings.json">
+    ```json
+    {
+      "cursor.proWorkflow.enabled": true,
+      "cursor.proWorkflow.dbPath": "~/.pro-workflow/data.db",
+      "cursor.proWorkflow.autoWrapUp": false,
+      "cursor.proWorkflow.qualityGates": ["lint", "typecheck", "test"]
+    }
+    ```
+  </Tab>
+  <Tab title="package.json Scripts">
+    ```json
+    {
+      "scripts": {
+        "pw:search": "node scripts/search-learnings.js",
+        "pw:add-learning": "node scripts/add-learning.js",
+        "pw:wrap-up": "node scripts/wrap-up.js",
+        "pw:init": "node -e \"require('pro-workflow').initializeDatabase();\""
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Cross-Agent Workflows
+
+Use Claude Code for complex tasks, Cursor for quick edits:
+
+| Task | Tool | Why |
+|------|------|-----|
+| Planning | Claude Code | Native agent support |
+| Quick fixes | Cursor | Fast tab completions |
+| Multi-file refactor | Claude Code | Better orchestration |
+| Single-file edits | Cursor | Inline editing |
+| Code review | Claude Code | Reviewer agent |
+| Exploration | Both | Parallel sessions |
+
+<Tip>
+  Use the same `.mcp.json` and `~/.pro-workflow/data.db` across both tools. Learnings are shared!
+</Tip>
+
+## Feature Comparison
+
+<Accordion title="Claude Code vs Cursor Features">
+
+| Feature | Claude Code | Cursor |
+|---------|-------------|--------|
+| **Native Agents** | ✅ | ❌ (use rules) |
+| **Skills** | ✅ | ❌ (use rules) |
+| **Hooks** | ✅ | ❌ (use git hooks) |
+| **Commands** | ✅ `/command` | ⚠️ (custom scripts) |
+| **Worktrees** | ✅ Native | ⚠️ Manual |
+| **MCP Servers** | ✅ | ✅ |
+| **Database API** | ✅ | ✅ |
+| **Tab Completion** | ❌ | ✅ |
+| **Inline Edit** | ❌ | ✅ |
+| **Multi-Phase Dev** | ✅ Native | ⚠️ Manual |
+
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="SkillKit" icon="wand-magic-sparkles" href="/api/plugin/skillkit">
+    Translate skills to any agent
+  </Card>
+  <Card title="Claude Code Plugin" icon="terminal" href="/api/plugin/claude-code">
+    Full-featured Claude Code setup
+  </Card>
+  <Card title="Database API" icon="database" href="/api/database/overview">
+    Learnings and session tracking
+  </Card>
+  <Card title="Cross-Agent Guide" icon="arrows-left-right" href="/guides/workflows/cross-agent">
+    Use both tools together
+  </Card>
+</CardGroup>

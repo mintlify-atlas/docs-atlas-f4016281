@@ -1,0 +1,30 @@
+---
+title: /search
+description: Search learnings database with FTS5 full-text search
+---
+
+# /search Command
+
+Search the pro-workflow learnings database using full-text search (BM25).
+
+## Syntax
+
+```bash
+/search <query>
+```
+
+**Examples:**
+```bash
+/search testing
+/search "file paths"
+/search git commit
+```
+
+## Search Features
+
+- **BM25 ranking**: Results ranked by relevance
+- **Prefix matching**: "test" matches "testing", "tests"
+- **Phrase search**: Use quotes for exact phrases
+- **Multiple terms**: Space-separated terms are OR'd
+
+See [Database Search API](/api/database/search) for complete details.

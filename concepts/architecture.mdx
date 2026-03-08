@@ -1,0 +1,306 @@
+---
+title: Architecture
+description: Understanding the three-layer architecture of Commands, Agents, and Skills
+---
+
+Pro Workflow is built on a three-layer architecture that separates concerns and enables powerful orchestration patterns. Each layer has a single responsibility and clear boundaries.
+
+## The Three Layers
+
+```text
+Command (entry point, user-facing)
+  └── Agent (execution, constrained tools)
+        └── Skill (domain knowledge, preloaded)
+```
+
+<CardGroup cols={3}>
+  <Card title="Commands" icon="terminal">
+    Handle user interaction and parameter collection
+  </Card>
+  <Card title="Agents" icon="robot">
+    Execute workflows with constrained tool access
+  </Card>
+  <Card title="Skills" icon="brain">
+    Provide domain-specific knowledge and procedures
+  </Card>
+</CardGroup>
+
+## Layer Responsibilities
+
+### Commands: Entry Points
+
+Commands are user-facing entry points that:
+- Accept user input via `$ARGUMENTS`
+- Substitute dynamic context with `!\`command\``
+- Delegate to agents or execute workflows directly
+- Define tool whitelists and model overrides
+
+**Example**: The `/develop` command
+
+```markdown
+---
+description: Build a feature using Research > Plan > Implement phases
+argument-hint: <feature description>
+---
+
+Build features through structured phases with validation gates.
+
+Feature: $ARGUMENTS
+
+Current branch: !\`git branch --show-current\`
+```
+
+### Agents: Execution Engines
+
+Agents are specialized workers with:
+- Constrained tool access (whitelist or blacklist)
+- Preloaded skills for domain knowledge
+- Persistent memory (user/project/local scopes)
+- Background execution and worktree isolation options
+
+**Example**: The orchestrator agent
+
+```yaml
+---
+name: orchestrator
+description: Multi-phase development agent. Use PROACTIVELY when building features
+tools: ["Read", "Glob", "Grep", "Bash", "Edit", "Write"]
+skills: ["pro-workflow"]
+model: opus
+memory: project
+---
+```
+
+<Note>
+  Agents with `PROACTIVELY` in their description can be auto-invoked by Claude when appropriate.
+</Note>
+
+### Skills: Domain Knowledge
+
+Skills provide specialized knowledge in two modes:
+
+**Preloaded (Agent Skills)**
+- Full content injected at agent startup
+- Always available, no invocation needed
+- Use for knowledge the agent always needs
+- Cost: uses context tokens
+
+**On-Demand (Invoked Skills)**
+- Loaded only when called via `/skill-name`
+- Use `context: fork` for isolated execution
+- Use for procedures run occasionally
+- Keeps main context lean
+
+## System Diagram
+
+<p align="center">
+  <img src="/images/architecture-diagram.svg" alt="Pro Workflow Architecture" />
+</p>
+
+The diagram shows:
+1. **User** interacts via commands (`/develop`, `/commit`, etc.)
+2. **Commands** delegate to specialized agents
+3. **Agents** execute with preloaded skills and constrained tools
+4. **Skills** provide domain knowledge and procedures
+5. **Hooks** observe and intervene at 18 lifecycle events
+6. **Memory** persists learnings across sessions
+
+## Component Relationships
+
+### Commands → Agents
+
+Commands delegate to agents for execution:
+
+```markdown
+# In /develop command
+Delegate to orchestrator agent:
+- Research the codebase
+- Score confidence
+- Present plan
+```
+
+### Agents → Skills
+
+Agents load skills at startup for domain knowledge:
+
+```yaml
+# In orchestrator.md
+skills: ["pro-workflow", "project-patterns"]
+```
+
+### Skills → Tools
+
+Skills can constrain available tools:
+
+```yaml
+# In skill frontmatter
+allowed-tools: ["Read", "Grep"]
+context: fork  # Isolated execution
+```
+
+## Configuration Hierarchy
+
+<Steps>
+  <Step title="Enterprise Policies">
+    Managed policies take highest precedence (enterprise deployments)
+  </Step>
+  <Step title="User Settings">
+    Global settings in `~/.claude/settings.json`
+  </Step>
+  <Step title="Project Settings">
+    Project-specific in `.claude/settings.local.json`
+  </Step>
+  <Step title="Component Frontmatter">
+    Command, agent, and skill-specific overrides
+  </Step>
+</Steps>
+
+Settings cascade down the hierarchy, with lower levels overriding higher ones.
+
+## Memory Architecture
+
+Multiple memory systems work together:
+
+| System | Scope | Managed By | When Loaded |
+|--------|-------|------------|-------------|
+| CLAUDE.md | Project | You | Every session (ancestors), lazy (descendants) |
+| CLAUDE.local.md | Personal | You | Every session (gitignored) |
+| Auto Memory | User | Claude | Session start (first 200 lines) |
+| Agent Memory | Per-agent | Agent | Agent invocation |
+| Pro-Workflow DB | User | Hooks | Session start (via SessionStart hook) |
+
+<Warning>
+  Keep root CLAUDE.md under 150 lines. It loads every session regardless of where you work.
+</Warning>
+
+## Tool Access Patterns
+
+### Read-Only Agents
+
+For planning and exploration:
+
+```yaml
+tools: ["Read", "Glob", "Grep"]
+```
+
+### Full-Access Agents
+
+For implementation:
+
+```yaml
+tools: ["Read", "Glob", "Grep", "Bash", "Edit", "Write"]
+```
+
+### Selective Blocking
+
+Block dangerous operations:
+
+```yaml
+tools: ["*"]  # All tools
+disallowedTools: ["Bash"]  # Except Bash
+```
+
+## Model Selection by Layer
+
+Different layers can use different models:
+
+| Layer | Typical Model | Reasoning |
+|-------|---------------|----------|
+| Commands | Default | Simple delegation |
+| Planner Agent | Opus 4.6 | Deep reasoning needed |
+| Implementer Agent | Sonnet 4.6 | Balanced speed/quality |
+| Scout Agent | Haiku 4.5 | Fast read-only exploration |
+
+<Tip>
+  Opus 4.6 and Sonnet 4.6 auto-calibrate reasoning depth—no need to toggle thinking mode manually.
+</Tip>
+
+## Best Practices
+
+### Do
+
+<Check>Use read-only agents for planning phases</Check>
+<Check>Preload frequently-needed skills into agents</Check>
+<Check>Use `context: fork` for heavy, isolated procedures</Check>
+<Check>Set `background: true` for long-running exploration</Check>
+<Check>Use `memory: project` for agents that should learn patterns</Check>
+
+### Don't
+
+<X>Give all agents all tools—constrain access</X>
+<X>Preload rarely-used skills—invoke on-demand instead</X>
+<X>Skip the planning phase for >5 file changes</X>
+<X>Load every skill into main context—be selective</X>
+
+## Extension Points
+
+The architecture provides multiple extension points:
+
+<AccordionGroup>
+  <Accordion title="Custom Commands">
+    Create slash commands in `~/.claude/commands/` or `.claude/commands/`
+    
+    ```markdown
+    ---
+    description: Your custom command
+    argument-hint: <input>
+    ---
+    
+    Your command logic here
+    ```
+  </Accordion>
+  
+  <Accordion title="Custom Agents">
+    Define specialized agents in `~/.claude/agents/` or `.claude/agents/`
+    
+    ```yaml
+    ---
+    name: your-agent
+    description: What it does (include PROACTIVELY for auto-invoke)
+    tools: ["Read", "Edit"]
+    skills: ["domain-knowledge"]
+    ---
+    
+    Agent system prompt
+    ```
+  </Accordion>
+  
+  <Accordion title="Custom Skills">
+    Add domain knowledge in `~/.claude/skills/` or `.claude/skills/`
+    
+    ```yaml
+    ---
+    name: your-skill
+    description: When to invoke
+    user-invocable: true
+    ---
+    
+    Skill content with procedures and knowledge
+    ```
+  </Accordion>
+  
+  <Accordion title="Hook Scripts">
+    React to 18 lifecycle events in `settings.json`
+    
+    ```json
+    {
+      "hooks": {
+        "SessionStart": "Load custom data",
+        "PreToolUse": "Validate before edits",
+        "PostToolUse": "Check after changes"
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Orchestration Patterns" icon="diagram-project" href="/concepts/orchestration-patterns">
+    Learn how to wire Commands, Agents, and Skills together
+  </Card>
+  <Card title="Multi-Phase Development" icon="timeline" href="/concepts/multi-phase-development">
+    Understand Research > Plan > Implement workflows
+  </Card>
+</CardGroup>

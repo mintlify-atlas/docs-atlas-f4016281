@@ -1,0 +1,367 @@
+---
+title: /develop
+description: Multi-phase feature development with Research > Plan > Implement > Review workflow
+---
+
+# /develop Command
+
+Build features through structured phases with validation gates. The `/develop` command implements the RPI (Research > Plan > Implement) pattern with built-in confidence scoring and approval gates.
+
+## Syntax
+
+```bash
+/develop <feature description>
+```
+
+**Examples:**
+```bash
+/develop add user authentication
+/develop implement rate limiting for API endpoints
+/develop refactor database connection pooling
+```
+
+<Note>
+The `/develop` command delegates to the **orchestrator agent**, which has memory and spans multiple phases.
+</Note>
+
+## The Four-Phase Workflow
+
+<Steps>
+  <Step title="Phase 1: Research">
+    Explore the codebase to understand scope and constraints.
+    
+    **Activities:**
+    1. Find all relevant files and existing patterns
+    2. Check dependencies and constraints
+    3. Score confidence across 5 dimensions (0-100)
+    
+    **Confidence Scoring:**
+    - **Scope clarity** (0-20): Know exactly what files change?
+    - **Pattern familiarity** (0-20): Similar patterns exist?
+    - **Dependency awareness** (0-20): Know what depends on changed code?
+    - **Edge cases** (0-20): Can identify the edge cases?
+    - **Test strategy** (0-20): Know how to verify?
+    
+    **Decision Gate:**
+    - Score ≥ 70 → Present research findings and move to Phase 2
+    - Score &lt; 70 → Identify gaps, gather more context, re-score
+  </Step>
+  
+  <Step title="Phase 2: Plan">
+    Present a detailed plan for approval.
+    
+    **Plan Format:**
+    ```text
+    PLAN: [Feature Name]
+    
+    Goal: [one sentence]
+    
+    Files to modify:
+    1. path/file.ts - [what changes]
+    
+    New files:
+    1. path/new.ts - [purpose]
+    
+    Approach:
+    1. [step with rationale]
+    
+    Risks:
+    - [potential issue and mitigation]
+    
+    Test strategy:
+    - [how to verify]
+    ```
+    
+    **Approval Gate:**
+    Wait for "proceed" or "approved" before continuing.
+  </Step>
+  
+  <Step title="Phase 3: Implement">
+    Execute the approved plan with regular checkpoints.
+    
+    **Workflow:**
+    1. Make changes in plan order
+    2. Run tests after each file change
+    3. Pause for review every 5 edits
+    4. Run full quality gates at the end (lint, typecheck, test)
+    
+    <Warning>
+    If implementation deviates from the plan, pause and explain why before proceeding.
+    </Warning>
+  </Step>
+  
+  <Step title="Phase 4: Review & Commit">
+    Final review and commit with conventional format.
+    
+    **Checklist:**
+    1. Self-review all changes for issues
+    2. Check for console.log, TODOs, secrets
+    3. Present summary for final approval
+    4. Commit with conventional message
+    
+    **Learning Capture:**
+    After completing, ask:
+    - What corrections were made during implementation?
+    - Any patterns worth adding to LEARNED?
+    - Format: `[LEARN] Category: Rule`
+  </Step>
+</Steps>
+
+## Confidence Scoring Example
+
+**Task:** Add rate limiting to /api/login
+
+```yaml
+Research Phase Results:
+
+Scope clarity: 18/20
+  ✓ Know exactly which files to modify (auth.controller.ts, middleware/)
+  ✗ Uncertain about Redis setup location
+
+Pattern familiarity: 16/20
+  ✓ Similar middleware exists for CORS
+  ✗ No existing Redis examples in codebase
+
+Dependency awareness: 15/20
+  ✓ Know /api/login is called by mobile and web clients
+  ✗ Uncertain if any internal services call this endpoint
+
+Edge cases: 17/20
+  ✓ Identified: distributed rate limiting, clock skew
+  ✗ Need to verify: shared session IDs across devices
+
+Test strategy: 19/20
+  ✓ Clear approach: integration tests + load testing
+
+Total Score: 85/100 → PROCEED TO PLANNING
+```
+
+## When to Use /develop
+
+<Tabs>
+  <Tab title="Use /develop">
+    **Multi-file changes:**
+    - Features touching 3+ files
+    - Refactors with cross-cutting concerns
+    - New subsystems or modules
+    
+    **High-risk changes:**
+    - Database migrations
+    - API contract changes
+    - Authentication/authorization logic
+    
+    **Unfamiliar territory:**
+    - Working with new libraries
+    - Implementing patterns you haven't used before
+    - Making architectural decisions
+  </Tab>
+  
+  <Tab title="Skip /develop">
+    **Simple changes:**
+    - Single-file edits
+    - Fixing typos or formatting
+    - Adding logging or comments
+    
+    **Repetitive tasks:**
+    - Adding similar tests
+    - Updating documentation
+    - Bumping versions
+    
+    **Hotfixes:**
+    - Emergency production fixes
+    - Reverting commits
+    - Quick bug patches
+  </Tab>
+</Tabs>
+
+## Integration with Orchestrator Agent
+
+The `/develop` command delegates to the **orchestrator** agent:
+
+```yaml
+---
+name: orchestrator
+description: Multi-phase feature development
+tools: ["Read", "Grep", "Glob", "Edit", "Write", "Bash"]
+skills: ["project-patterns"]
+memory: true
+model: opus
+---
+```
+
+**Key Features:**
+- **Memory enabled**: Orchestrator remembers context across phases
+- **Full tool access**: Can read, edit, and run commands
+- **Skill preloading**: Project patterns loaded automatically
+
+See [Orchestrator Agent](/agents/orchestrator) for details.
+
+## Quality Gates
+
+Phase 3 (Implement) runs quality gates at the end:
+
+```bash
+# Lint check
+npm run lint
+
+# Type check
+npm run typecheck
+
+# Run tests
+npm test -- --changed --passWithNoTests
+```
+
+<Note>
+Quality gate commands are configurable in `config.json`. See [Quality Gates Configuration](/configuration/quality-gates).
+</Note>
+
+## Example Session
+
+```bash
+> /develop add webhook signature verification
+
+[PHASE 1: RESEARCH]
+Exploring codebase for webhook handling...
+
+Found:
+- webhooks/handler.ts (current implementation)
+- webhooks/types.ts (type definitions)
+- No existing signature verification
+
+Dependencies:
+- Used by 3 webhook endpoints
+- Called from external services (GitHub, Stripe)
+
+Confidence Score: 78/100 → PROCEED
+
+[PHASE 2: PLAN]
+PLAN: Webhook Signature Verification
+
+Goal: Verify HMAC-SHA256 signatures on all incoming webhooks
+
+Files to modify:
+1. webhooks/handler.ts - Add signature verification
+2. webhooks/types.ts - Add signature header type
+3. middleware/verify-webhook.ts - New middleware
+
+Approach:
+1. Create signature verification middleware
+2. Extract signing secret from env
+3. Compare computed vs provided signature
+4. Return 401 if mismatch
+
+Risks:
+- Timing attacks on signature comparison (use crypto.timingSafeEqual)
+- Missing webhook secret breaks all webhooks (add fallback)
+
+Test strategy:
+- Unit tests for signature generation/verification
+- Integration tests with real webhook payloads
+
+Waiting for approval...
+
+> proceed
+
+[PHASE 3: IMPLEMENT]
+Implementing changes...
+✓ Created middleware/verify-webhook.ts
+✓ Updated webhooks/handler.ts
+✓ Added tests
+✓ Lint: PASS
+✓ Types: PASS
+✓ Tests: 8/8 PASS
+
+[PHASE 4: REVIEW & COMMIT]
+Changes:
+- 3 files modified (+127 -8)
+- No console.log statements
+- No TODOs
+
+Suggested commit:
+  feat(webhooks): add HMAC-SHA256 signature verification
+  
+  Verify webhook signatures using HMAC-SHA256 to prevent
+  unauthorized webhook calls. Returns 401 if signature
+  validation fails. Uses timing-safe comparison.
+  
+  Closes #234
+
+Proceed with commit? (y/n)
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Trust the Research Phase" icon="magnifying-glass">
+    Don't skip research even if you think you know the codebase. Low confidence scores catch surprises.
+  </Card>
+  <Card title="Wait for Approval" icon="hand">
+    Always review the plan before proceeding. It's easier to adjust plans than to refactor code.
+  </Card>
+  <Card title="Pause at Checkpoints" icon="pause">
+    Review progress every 5 edits. Catch mistakes early before they compound.
+  </Card>
+  <Card title="Capture Learnings" icon="brain">
+    After completing, run `/learn-rule` to capture any corrections or patterns discovered.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Research phase takes too long">
+    If research is slow:
+    - Use Task agent with confidence scoring
+    - Provide file hints in the feature description
+    - Narrow scope to specific subsystems
+    
+    Example:
+    ```bash
+    /develop add caching to user profile endpoint (focus on api/ and cache/)
+    ```
+  </Accordion>
+  
+  <Accordion title="Plan keeps getting rejected">
+    If plans aren't landing:
+    - Be more specific in feature description
+    - Provide examples of desired behavior
+    - Reference existing similar features
+    
+    Example:
+    ```bash
+    /develop add rate limiting similar to the CORS middleware
+    ```
+  </Accordion>
+  
+  <Accordion title="Quality gates failing">
+    If quality gates consistently fail:
+    - Run gates manually before `/develop`
+    - Fix existing issues first
+    - Adjust gate commands in config.json
+    
+    See [Quality Gates Configuration](/configuration/quality-gates).
+  </Accordion>
+</AccordionGroup>
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="/commit" icon="code-commit" href="/commands/commit">
+    Manual commit after Phase 4
+  </Card>
+  <Card title="/wrap-up" icon="check-double" href="/commands/wrap-up">
+    End session after /develop
+  </Card>
+  <Card title="/replay" icon="rotate-left" href="/commands/replay">
+    Surface learnings before /develop
+  </Card>
+  <Card title="/learn-rule" icon="brain" href="/commands/learn-rule">
+    Capture patterns after /develop
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+- Read [Multi-Phase Development concept](/concepts/multi-phase-development)
+- Learn about [Orchestrator Agent](/agents/orchestrator)
+- Configure [Quality Gates](/configuration/quality-gates)

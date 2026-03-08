@@ -1,0 +1,371 @@
+---
+title: /learn-rule
+description: Capture corrections as persistent learning rules
+---
+
+# /learn-rule Command
+
+Capture a lesson from this session into permanent memory. The `/learn-rule` command is the core of the self-correction loop — every correction becomes a rule that prevents future mistakes.
+
+## Syntax
+
+```bash
+/learn-rule
+/learn-rule <rule>
+```
+
+**Examples:**
+```bash
+/learn-rule
+/learn-rule Navigation: Confirm full path when multiple files share a name
+```
+
+## The Self-Correction Process
+
+<Steps>
+  <Step title="Identify the Lesson">
+    **What went wrong?**
+    - What mistake was made?
+    - What should have happened instead?
+    - What would prevent this next time?
+    
+    **Example:**
+    - Mistake: Edited src/utils.ts when user meant src/lib/utils.ts
+    - Should: Confirm full path before editing files with common names
+  </Step>
+  
+  <Step title="Format the Rule">
+    Use the standard learning format:
+    
+    ```text
+    [LEARN] Category: One-line rule
+    ```
+    
+    **Categories:**
+    - **Navigation** — File paths, finding code
+    - **Editing** — Code changes, patterns
+    - **Testing** — Test approaches
+    - **Git** — Commits, branches
+    - **Context** — Memory, compaction
+    - **Tools** — MCP servers, CLI flags
+    - **Prompting** — How to ask Claude
+    - **Architecture** — Design decisions
+    
+    **Example:**
+    ```text
+    [LEARN] Navigation: Confirm full path before editing files with common names
+    ```
+  </Step>
+  
+  <Step title="Save to Database">
+    The command saves the learning to SQLite:
+    
+    ```sql
+    INSERT INTO learnings (
+      category,
+      rule,
+      context,
+      project,
+      created_at
+    ) VALUES (
+      'Navigation',
+      'Confirm full path before editing files with common names',
+      '<session context>',
+      'my-app',
+      '2026-03-08 10:30:00'
+    )
+    ```
+    
+    **Indexed for FTS5 search:** The rule is searchable via `/search` and surfaces automatically via `/replay`.
+  </Step>
+  
+  <Step title="Update CLAUDE.md (Optional)">
+    For critical learnings, add to CLAUDE.md:
+    
+    ```markdown
+    ## LEARNED
+    
+    ### Navigation
+    - Confirm full path before editing files with common names
+    - Use Glob first to list all matches before Read
+    ```
+    
+    This ensures the rule loads in every session, not just on demand.
+  </Step>
+</Steps>
+
+## Learning Categories
+
+### Navigation
+
+**File paths and code location:**
+
+```text
+[LEARN] Navigation: Confirm full path before editing files with common names
+[LEARN] Navigation: Use Glob first to list all matches before Read
+[LEARN] Navigation: Check both src/ and lib/ for utility functions
+```
+
+### Editing
+
+**Code changes and patterns:**
+
+```text
+[LEARN] Editing: Always add error handling when calling external APIs
+[LEARN] Editing: Use const assertions for string literal types
+[LEARN] Editing: Prefer early returns over nested conditionals
+```
+
+### Testing
+
+**Test approaches and patterns:**
+
+```text
+[LEARN] Testing: Mock external API calls in unit tests
+[LEARN] Testing: Test edge cases first, happy path last
+[LEARN] Testing: Use describe blocks to group related tests
+```
+
+### Git
+
+**Commits, branches, and workflows:**
+
+```text
+[LEARN] Git: Run quality gates before every commit
+[LEARN] Git: Use feat(scope) format for commit messages
+[LEARN] Git: Never force push to main branch
+```
+
+### Context
+
+**Memory and compaction:**
+
+```text
+[LEARN] Context: Compact at task boundaries, not mid-task
+[LEARN] Context: Check /context before starting heavy exploration
+[LEARN] Context: Use /replay at session start to load relevant learnings
+```
+
+### Tools
+
+**MCP servers and CLI:**
+
+```text
+[LEARN] Tools: Keep &lt;10 MCP servers active for performance
+[LEARN] Tools: Use --worktree flag for parallel sessions
+[LEARN] Tools: Disable unused MCPs with disabledMcpServers
+```
+
+## Example Flow
+
+```bash
+> I corrected Claude for editing the wrong file again.
+
+Acknowledged. I edited src/utils.ts when you meant src/lib/utils.ts.
+
+[LEARN] Navigation: Confirm full path before editing files with common names
+
+Should I save this to the database?
+
+> yes
+
+> /learn-rule
+
+Extracting lesson from correction...
+
+Identified:
+  Mistake: Edited wrong file (src/utils.ts vs src/lib/utils.ts)
+  Category: Navigation
+  Rule: Confirm full path before editing files with common names
+
+Saving to database...
+✓ Saved learning #47
+
+Add to CLAUDE.md? (y/n)
+> y
+
+Updating CLAUDE.md...
+✓ Added to ## LEARNED > Navigation
+
+This learning will now:
+  1. Surface in /search navigation
+  2. Surface in /replay before related tasks
+  3. Load in every session (via CLAUDE.md)
+```
+
+## Database Schema
+
+Learnings are stored with full-text search:
+
+```sql
+CREATE TABLE learnings (
+  id INTEGER PRIMARY KEY,
+  category TEXT NOT NULL,
+  rule TEXT NOT NULL,
+  context TEXT,
+  project TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE VIRTUAL TABLE learnings_fts USING fts5(
+  rule,
+  context,
+  content='learnings',
+  content_rowid='id'
+);
+```
+
+**Search uses BM25 ranking** for relevance.
+
+See [Database API](/api/database/learnings) for details.
+
+## Integration with Other Commands
+
+### With /wrap-up
+
+Wrap-up suggests learnings to capture:
+
+```bash
+> /wrap-up
+
+[3/5] Learning Capture
+─────────────────────
+
+Corrections this session:
+  1. Fixed file path confusion (src/utils.ts)
+  2. Added missing error handling
+  
+Suggested learnings:
+  [LEARN] Navigation: Confirm full path before editing files with common names
+  [LEARN] Editing: Always add error handling when calling external APIs
+  
+Save these learnings? (y/n)
+```
+
+### With /replay
+
+Replay surfaces past learnings:
+
+```bash
+> /replay refactor authentication
+
+Surfacing relevant learnings...
+
+From 3 days ago:
+  [LEARN] Testing: Mock external API calls in unit tests
+  Context: When refactoring auth middleware
+  
+From 1 week ago:
+  [LEARN] Editing: Always add error handling when calling external APIs
+  Context: Fixed auth error handling
+```
+
+### With /search
+
+Search finds learnings by keyword:
+
+```bash
+> /search file paths
+
+Found 3 learnings:
+
+#47 [Navigation] Confirm full path before editing files with common names
+    Created: 2 days ago
+    Project: my-app
+    
+#23 [Navigation: Use Glob first to list all matches before Read
+    Created: 1 week ago
+    Project: my-app
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Capture Every Correction" icon="brain">
+    Don't skip corrections. Every mistake is a learning opportunity that compounds.
+  </Card>
+  <Card title="Be Specific" icon="bullseye">
+    Vague rules don't help. "Check file paths" is worse than "Confirm full path before editing files with common names".
+  </Card>
+  <Card title="Use Right Category" icon="tag">
+    Correct categorization helps `/replay` surface relevant learnings.
+  </Card>
+  <Card title="Update CLAUDE.md" icon="file-pen">
+    Add critical learnings to CLAUDE.md so they load in every session.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Database writes failing">
+    If learnings aren't saving:
+    
+    1. Check database exists:
+       ```bash
+       ls ~/.pro-workflow/data.db
+       ```
+    
+    2. Initialize if missing:
+       ```bash
+       cd ~/.claude/plugins/*/pro-workflow
+       npm run db:init
+       ```
+    
+    3. Check permissions:
+       ```bash
+       chmod 644 ~/.pro-workflow/data.db
+       ```
+  </Accordion>
+  
+  <Accordion title="Learnings not surfacing in /replay">
+    If past learnings don't surface:
+    
+    1. Check FTS5 index:
+       ```sql
+       SELECT * FROM learnings_fts WHERE rule MATCH 'your-keyword';
+       ```
+    
+    2. Rebuild index:
+       ```sql
+       DELETE FROM learnings_fts;
+       INSERT INTO learnings_fts(learnings_fts) VALUES('rebuild');
+       ```
+    
+    3. Verify search works:
+       ```bash
+       /search your-keyword
+       ```
+  </Accordion>
+  
+  <Accordion title="CLAUDE.md getting too long">
+    If CLAUDE.md exceeds 150 lines:
+    
+    1. Keep only top 10-20 critical learnings in CLAUDE.md
+    2. Let other learnings surface on-demand via `/replay`
+    3. Split into modules if needed (see [Split Memory](/guides/split-memory))
+  </Accordion>
+</AccordionGroup>
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="/replay" icon="rotate-left" href="/commands/replay">
+    Surface past learnings before starting work
+  </Card>
+  <Card title="/search" icon="magnifying-glass" href="/commands/search">
+    Search learnings database by keyword
+  </Card>
+  <Card title="/list" icon="list" href="/commands/list">
+    List all stored learnings
+  </Card>
+  <Card title="Learn Rule Skill" icon="brain" href="/skills/learn-rule">
+    Deep dive on learning capture
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+- Learn about [Self-Correction Loop](/concepts/self-correction-loop)
+- Explore [Database API](/api/database/learnings)
+- Set up [Learning Hooks](/hooks/custom-hooks)
