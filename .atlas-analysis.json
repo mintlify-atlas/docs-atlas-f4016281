@@ -1,0 +1,192 @@
+{
+  "projectType": "framework",
+  "projectName": "Pro Workflow",
+  "projectDescription": "Battle-tested AI coding workflow framework with orchestration patterns, agents, hooks, and self-correcting memory for Claude Code, Cursor, and 32+ agents",
+  "theme": "aspen",
+  "primaryColor": "#D97757",
+  "lightColor": "#E8926F",
+  "darkColor": "#1e1e2e",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/self-correction-loop",
+              "concepts/orchestration-patterns",
+              "concepts/multi-phase-development",
+              "concepts/parallel-worktrees",
+              "concepts/80-20-review"
+            ]
+          },
+          {
+            "group": "Skills",
+            "pages": [
+              "skills/overview",
+              "skills/pro-workflow",
+              "skills/smart-commit",
+              "skills/wrap-up",
+              "skills/learn-rule",
+              "skills/parallel-worktrees",
+              "skills/replay-learnings",
+              "skills/session-handoff",
+              "skills/insights",
+              "skills/deslop",
+              "skills/context-optimizer",
+              "skills/orchestrate"
+            ]
+          },
+          {
+            "group": "Agents",
+            "pages": [
+              "agents/overview",
+              "agents/planner",
+              "agents/reviewer",
+              "agents/scout",
+              "agents/orchestrator",
+              "agents/debugger"
+            ]
+          },
+          {
+            "group": "Commands",
+            "pages": [
+              "commands/overview",
+              "commands/develop",
+              "commands/doctor",
+              "commands/commit",
+              "commands/wrap-up",
+              "commands/learn-rule",
+              "commands/handoff",
+              "commands/insights",
+              "commands/replay",
+              "commands/search",
+              "commands/list",
+              "commands/parallel"
+            ]
+          },
+          {
+            "group": "Hooks & Events",
+            "pages": [
+              "hooks/overview",
+              "hooks/lifecycle",
+              "hooks/custom-hooks"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/settings",
+              "configuration/mcp-servers",
+              "configuration/quality-gates",
+              "configuration/model-preferences"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/cross-agent-workflows",
+              "guides/context-loading",
+              "guides/daily-habits",
+              "guides/cli-cheatsheet",
+              "guides/split-memory"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Database API",
+            "pages": [
+              "api/database/overview",
+              "api/database/learnings",
+              "api/database/sessions",
+              "api/database/search"
+            ]
+          },
+          {
+            "group": "Plugin API",
+            "pages": [
+              "api/plugin/claude-code",
+              "api/plugin/cursor",
+              "api/plugin/skillkit"
+            ]
+          },
+          {
+            "group": "Command API",
+            "pages": [
+              "api/commands/frontmatter",
+              "api/commands/arguments",
+              "api/commands/delegation"
+            ]
+          },
+          {
+            "group": "Agent API",
+            "pages": [
+              "api/agents/frontmatter",
+              "api/agents/tools",
+              "api/agents/skills",
+              "api/agents/memory"
+            ]
+          },
+          {
+            "group": "Skill API",
+            "pages": [
+              "api/skills/frontmatter",
+              "api/skills/discovery",
+              "api/skills/preloading"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Self-correcting memory with SQLite and FTS5 search",
+    "Orchestration patterns: Command > Agent > Skill architecture",
+    "18 hook events for lifecycle management",
+    "5 specialized agents (planner, reviewer, scout, orchestrator, debugger)",
+    "11 modular skills for workflow optimization",
+    "Multi-phase development (Research > Plan > Implement > Review)",
+    "Parallel worktrees for zero dead time",
+    "80/20 review pattern with quality gates",
+    "Cross-agent support (Claude Code, Cursor, 32+ agents via SkillKit)",
+    "Split memory system for complex projects"
+  ],
+  "publicApiSurface": [
+    "/develop - Multi-phase feature development",
+    "/doctor - Health check for setup",
+    "/commit - Smart commit with quality gates",
+    "/wrap-up - End-of-session ritual",
+    "/learn-rule - Capture corrections to memory",
+    "/handoff - Generate session handoff",
+    "/insights - Session analytics",
+    "/replay - Surface past learnings",
+    "/search - Search learnings by keyword",
+    "/list - List all stored learnings",
+    "/parallel - Parallel worktree setup",
+    "planner agent - Break down complex tasks",
+    "reviewer agent - Code review and security audit",
+    "scout agent - Confidence-gated exploration",
+    "orchestrator agent - Multi-phase workflows with memory",
+    "debugger agent - Systematic bug investigation",
+    "SessionStart hook - Load learnings from database",
+    "PreToolUse hook - Quality gate reminders",
+    "PostToolUse hook - Check for console.log, TODOs, secrets",
+    "SubagentStart/Stop hooks - Agent lifecycle logging",
+    "TaskCompleted hook - Quality gate on completion",
+    "PermissionRequest hook - Flag dangerous operations"
+  ]
+}
